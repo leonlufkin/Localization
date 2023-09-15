@@ -1,26 +1,38 @@
 import numpy as np
-import jax
-import jax.numpy as jnp
-import jax.scipy as jsp
-from jax import grad, jit, vmap
 
-from jax.scipy.special import erf as gain_function
+from scipy.special import erf
 import matplotlib.pyplot as plt
-
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 from scipy.stats import entropy
 
 import argparse
 import datetime
 
 def Z(g):
-    return jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (g**2) / (1 + (g**2)) ) )
+    return np.sqrt( (2/np.pi) * np.arcsin( (g**2) / (1 + (g**2)) ) )
 
-def generate_gaussian(key, L, xi, num_samples=1):
-    # we are fixing dim=1 in this script
-    C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
-    C = jnp.exp(-C ** 2 / (xi ** 2))
-    z = jax.random.multivariate_normal(key, np.zeros(L), C, size=num_samples)
+def generate_gaussian(key, L, xi, dim=1, num_samples=1):
+    if dim > 2:
+        raise NotImplementedError("dim > 2 not implemented")
+    
+    C = np.abs(np.tile(np.arange(L)[:, np.newaxis], (1, L)) - np.tile(np.arange(L), (L, 1)))
+    C = np.exp(-C ** 2 / (xi ** 2))
+    
+    if dim > 1:
+        C = np.kron(C, C)
+    
+    z = np.random.multivariate_normal(key, np.zeros(L ** dim), C, size=num_samples)
+    if dim > 1:
+        z = z.reshape((num_samples, L, L))
+        
     return z
+
+def gain_function(x):
+    return erf(x)
 
 def generate_non_gaussian(L, xi, g, dim=1, num_samples=1):
     z = generate_gaussian(L, xi, dim=dim, num_samples=num_samples)
@@ -42,23 +54,104 @@ def compute_entropy(weights, low=-10, upp=10, delta=0.1, base=2):
             
     
     
+class Model(nn.Module):
+    def __init__(self):
+        super(Model, self).__init__()
     
-class NLGPDataset:
-    def __init__(self, L, xi1, xi2, g, batch_size=1, num_epochs=1):
+    def get_param_count(self) -> int:
+        """Count the number of params"""
+        return sum((np.prod(p.size()) for p in self.parameters()))
+
+    def get_trainable_param_count(self) -> int:
+        """Count the number of trainable params"""
+        model_parameters = filter(lambda p: p.requires_grad, self.parameters())
+        return sum((np.prod(p.size()) for p in model_parameters))
+
+    def freeze_weights(self) -> None:
+        """Freeze the model"""
+        for param in self.parameters():
+            param.requires_grad = False
+            
+class NeuralNet(Model):
+    def __init__(self, 
+                 input_dim, 
+                 hidden_dim, 
+                 activation=nn.Sigmoid(),
+                 second_layer='linear'):
+        super().__init__()
+        
+        device = torch.device('cpu')
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.activation = activation
+        
+        self.ff1 = nn.Linear(input_dim, hidden_dim, bias=True)
+        self.ff1.weight.data.normal_(0, 1/np.sqrt(input_dim)) # mean 0, variance 1/D
+        self.ff1.bias.data.zero_()
+        
+        if second_layer == 'linear':
+            self.ff2 = nn.Linear(hidden_dim, 1, bias=True)
+        elif second_layer == 'learnable_bias' or isinstance(second_layer, float):
+            class Bias(nn.Module):
+                def __init__(self, learnable_bias=True, bias_value=0.):
+                    super().__init__()
+                    bias = bias_value * torch.ones(1, device=device)
+                    self.bias = nn.Parameter(bias, requires_grad=learnable_bias)
+                def forward(self, x):
+                    x = torch.mean(x, dim=1).unsqueeze(1) # NOTE: we are taking the mean over the channels, rather than the sum
+                    x = x + self.bias
+                    return x
+                def to(self, device):
+                    return self
+            if second_layer == 'learnable_bias':
+                learnable_bias = True
+                bias_value = 0.
+            else:
+                learnable_bias = False
+                bias_value = second_layer
+            self.ff2 = Bias(learnable_bias, bias_value)
+        else:
+            raise NotImplementedError("second_layer must be 'linear', 'learnable_bias', or a float")
+            
+        self.ff1 = self.ff1.to(device)
+        self.ff2 = self.ff2.to(device)
+            
+    def forward(self, x):
+        x = self.activation(self.ff1(x))
+        out = self.ff2(x)
+        return out.squeeze(1)
+
+    def to(self, device):
+        self.ff1 = self.ff1.to(device)
+        self.ff2 = self.ff2.to(device)
+        return self
+
+    
+class NLGPDataset(Dataset):
+    def __init__(self, L, xi1, xi2, g, dim=1, batch_size=1, num_epochs=1):
         self.L = L
+        self.dim = dim
+        self.D = L ** dim
         self.xi1 = xi1
         self.xi2 = xi2
         self.g = g
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         
+        self.device = torch.device('cpu')
+        if torch.cuda.is_available():
+            self.device = torch.device('cuda')
+        
     def __len__(self):
         return self.num_epochs
     
     def __getitem__(self, idx):
         num_true = np.random.binomial(self.batch_size, 0.5)
-        X = jnp.zeros((0, self.L))
-        y = jnp.zeros(0)
+        X = np.zeros((0, self.D))
+        y = np.zeros(0)
         if num_true > 0:
             X = generate_non_gaussian(self.L, self.xi1, self.g, num_samples=num_true, dim=self.dim).reshape(-1, self.D)
             y = np.ones(num_true)
@@ -69,8 +162,8 @@ class NLGPDataset:
         X = np.concatenate((X, X_), axis=0)[ind]
         y = np.concatenate((y, y_), axis=0)[ind]
         
-        X = torch.from_numpy(X).float()
-        y = torch.tensor(y).float()
+        X = torch.from_numpy(X).float().to(self.device)
+        y = torch.tensor(y).float().to(self.device)
         
         return X, y
     

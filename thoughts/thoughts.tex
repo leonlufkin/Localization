@@ -1,0 +1,52 @@
+% GO TO: /Users/leonlufkin/Library/texmf/tex/latex
+%        to add custom packages to the path
+\documentclass{article}
+\usepackage{report}
+
+\title{Receptive Field Localization}
+\author{Leon Lufkin}
+\date{\today}
+
+\makeatletter
+\let\Title\@title
+\let\Author\@author
+\let\Date\@date
+
+\begin{document}
+
+%%%%%%%%%%%
+%% Model %%
+%%%%%%%%%%%
+\section{Model}
+We begin with a general model that encapsulates many of the works we will discuss.
+For an input $\mathbf{x}$, we want to predict a response $\mathbf{y}^*$.
+Our prediction is a function $f_\theta$ of $\mathbf{x}$.
+The function $f_\theta$ is parameterized by $\theta$.
+We will consider models of the form
+\begin{equation}
+  \label{eq:general_model}
+  f_\theta(\mathbf{x}) = y_\theta \left( \sum_i \alpha_\theta^{(i)} \phi_\theta^{(i)} (\mathbf{x}) \right).
+\end{equation}
+Here, $\mathbf{x}$ is an $L$-dimensional real vector and $\mathbf{y}^*$ is an $M$-dimensional real vector.
+The $\phi_i$ are basis functions that map from $\R^L$ to $\R^K$, and the $\alpha_i$ are real scalars.
+Additionally, the sum over $i$ need not be finite.
+The coefficients $\alpha_i$ may depend on $\mathbf{x}$ and our parameters $\theta$, but we suppress the former dependence for notational simplicity. 
+The function $y_\theta$ maps from $\R^K$ to $\R^M$ and is parameterized by $\theta$ as well.
+
+We will show how this model encapsulates the works we are interested in understanding.
+
+%%%%%%%%%%%%%%
+%% Ingrosso %%
+%%%%%%%%%%%%%%
+\section{Ingrosso et al. (2022)}
+The model in Ingrosso et al. (2022) sets $M = 1$, uses linear basis functions, and sets $y_\theta$ to be the mean function after applying a nonlinearity.
+That is,
+\begin{align}
+  \sum_i \alpha_\theta^{(i)} \phi_\theta^{(i)} (\mathbf{x}) &= \Theta \mathbf{x} + b_\theta \\
+  y_\theta(\mathbf{x}) &= \frac{1}{K} \bm{1}^\top \sigma(\mathbf{x}).
+\end{align}
+Here, $\Theta$ is a $K \times L$ matrix, $b_\theta$ is a $K$-dimensional vector, and $\sigma$ is a nonlinear function applied elementwise.
+
+
+
+\end{document}
