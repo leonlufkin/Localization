@@ -15,15 +15,16 @@ import datetime
 def Z(g):
     return jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (g**2) / (1 + (g**2)) ) )
 
-def generate_gaussian(key, L, xi, num_samples=1):
+def generate_gaussian(key, xi, L, dim=1, num_samples=1):
     # we are fixing dim=1 in this script
     C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
     C = jnp.exp(-C ** 2 / (xi ** 2))
-    z = jax.random.multivariate_normal(key, np.zeros(L), C, size=num_samples)
+    z = jax.random.multivariate_normal(key, np.zeros(L), C, shape=(num_samples,))
     return z
 
-def generate_non_gaussian(L, xi, g, dim=1, num_samples=1):
-    z = generate_gaussian(L, xi, dim=dim, num_samples=num_samples)
+# TODO(leonl): Vectorize this function with `jax.vmap` across `num_samples`!
+def generate_non_gaussian(key, xi, L, g, dim=1, num_samples=1000):
+    z = generate_gaussian(key, xi, L, dim=dim, num_samples=num_samples)
     x = gain_function(g * z) / Z(g)
     return x
 
@@ -73,6 +74,9 @@ class NLGPDataset:
         y = torch.tensor(y).float()
         
         return X, y
+
+class DataLoader:
+    pass
     
 class NLGPLoader(DataLoader):
     """
