@@ -11,20 +11,33 @@ from scipy.stats import entropy
 
 import argparse
 import datetime
+import timeit
 
 def Z(g):
     return jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (g**2) / (1 + (g**2)) ) )
 
-def generate_gaussian(key, xi, L, dim=1, num_samples=1):
-    # we are fixing dim=1 in this script
+def generate_gaussian(key, xi, L, num_samples=1):
     C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
     C = jnp.exp(-C ** 2 / (xi ** 2))
     z = jax.random.multivariate_normal(key, np.zeros(L), C, shape=(num_samples,))
     return z
 
 # TODO(leonl): Vectorize this function with `jax.vmap` across `num_samples`!
-def generate_non_gaussian(key, xi, L, g, dim=1, num_samples=1000):
-    z = generate_gaussian(key, xi, L, dim=dim, num_samples=num_samples)
+def generate_non_gaussian_samples(key, xi, L, g, num_samples=1000):
+    z = generate_gaussian(key, xi, L, num_samples=num_samples)
+    x = gain_function(g * z) / Z(g)
+    return x
+
+# FIXME: leon's attempt! (see below)
+def generate_non_gaussian(key, xi, L, g):
+    C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
+    C = jnp.exp(-C ** 2 / (xi ** 2))
+    z = jax.random.multivariate_normal(key, np.zeros(L), C)
+    x = gain_function(g * z) / Z(g)
+    return x
+
+def generate_non_gaussian_chatgpt(keys, xi, L, g):
+    z = vmap(lambda key: generate_gaussian(key, xi, L))(keys)
     x = gain_function(g * z) / Z(g)
     return x
 
@@ -41,57 +54,6 @@ def compute_entropy(weights, low=-10, upp=10, delta=0.1, base=2):
         entropies[neuron] = entropy(prob, base=base)
     return entropies
             
-    
-    
-    
-class NLGPDataset:
-    def __init__(self, L, xi1, xi2, g, batch_size=1, num_epochs=1):
-        self.L = L
-        self.xi1 = xi1
-        self.xi2 = xi2
-        self.g = g
-        self.batch_size = batch_size
-        self.num_epochs = num_epochs
-        
-    def __len__(self):
-        return self.num_epochs
-    
-    def __getitem__(self, idx):
-        num_true = np.random.binomial(self.batch_size, 0.5)
-        X = jnp.zeros((0, self.L))
-        y = jnp.zeros(0)
-        if num_true > 0:
-            X = generate_non_gaussian(self.L, self.xi1, self.g, num_samples=num_true, dim=self.dim).reshape(-1, self.D)
-            y = np.ones(num_true)
-        if num_true < self.batch_size:
-            X_ = generate_non_gaussian(self.L, self.xi2, self.g, num_samples=self.batch_size-num_true, dim=self.dim).reshape(-1, self.D)
-            y_ = -np.ones(self.batch_size-num_true)
-        ind = np.random.permutation(self.batch_size)
-        X = np.concatenate((X, X_), axis=0)[ind]
-        y = np.concatenate((y, y_), axis=0)[ind]
-        
-        X = torch.from_numpy(X).float()
-        y = torch.tensor(y).float()
-        
-        return X, y
-
-class DataLoader:
-    pass
-    
-class NLGPLoader(DataLoader):
-    """
-    Faster than generating one draw at a time, I hope.
-    """
-    def __init__(self, *args, batch_size=1, shuffle=False, num_workers=0, **kwargs):
-        dataset = NLGPDataset(*args, batch_size=batch_size, **kwargs)
-        super().__init__(dataset, batch_size=1, shuffle=shuffle, num_workers=num_workers)
-        
-def get_timestamp():
-    """
-    Return a date and time `str` timestamp.
-    Format: MM-DD_HH-MM-SS
-    """
-    return datetime.datetime.now().strftime("%m-%d_%H-%M-%S")
         
 def parse_args():
     # read command line arguments
@@ -123,58 +85,28 @@ def main(
     activation='tanh', second_layer='linear',
     path='.', **kwargs
 ):
-    # set up model
-    activation_fn = nn.Tanh() if activation == 'tanh' else nn.Sigmoid() if activation == 'sigmoid' else nn.ReLU()
-    model = NeuralNet(input_dim=L ** dim, hidden_dim=K, activation=activation_fn, second_layer=second_layer)
-    opt = torch.optim.SGD(model.parameters(), lr=lr)
-
-    # set up data
-    loader = NLGPLoader(L, xi1, xi2, gain, dim, batch_size=batch_size, num_epochs=num_epochs, shuffle=False, num_workers=0)
-    loss_fn = nn.MSELoss() if loss == 'mse' else nn.BCEWithLogitsLoss()
-
-    # train
-    losses = np.zeros(num_epochs)
-    accs = np.zeros(num_epochs)
-    iprs = []
-    every_epoch = min(max(num_epochs // 100, 1), 500)
-    for epoch, (X, y) in enumerate(loader):
-        X, y = X.squeeze(0), y.squeeze(0)
-        yhat = model(X)
-        loss_ = loss_fn(yhat, y)
-        opt.zero_grad()
-        loss_.backward()
-        opt.step()
-        
-        losses[epoch] = loss_.cpu().item()
-        accs[epoch] = acc_ = ((yhat > 0) == (y > 0)).to(torch.float32).mean().cpu().item()
-        
-        # print progress, record IPR
-        if epoch % every_epoch == 0 or epoch == num_epochs - 1:
-            weights = model.ff1.weight.detach().cpu().numpy()
-            ipr_ = np.power(weights, 4).sum(axis=1) / np.power(np.power(weights, 2).sum(axis=1), 2)
-            iprs.append(ipr_)
-            print(f'Epoch {epoch}: loss={losses[max(epoch-every_epoch,0):epoch+1].mean():.4f}, acc={accs[max(epoch-every_epoch,0):epoch+1].mean():.4f}, IPR>0.05={100 * np.mean(ipr_ > 0.05):.2f}%')
+    # original
+    key = jax.random.PRNGKey(0)
+    print("Generating samples the original way...")
+    t1 = timeit.timeit(lambda: generate_non_gaussian_samples(key, xi1, L, gain, num_samples=batch_size), number=100)
     
-            if False: #loss_.item() < 5e-3 or acc_ > 0.99:
-                print(f'Breaking early with loss={loss_:.4f}, acc={acc_:.4f}')
-                losses[epoch+1:] = np.nan
-                accs[epoch+1:] = np.nan
-                break
+    # attempt at vectorization
+    print("Generating samples the vectorized way...")
+    # generate_gaussian_vmap = vmap(generate_non_gaussian, in_axes=(0, None, None, None))
+    print("Splitting keys...")
+    keys = jax.random.split(jax.random.PRNGKey(0), batch_size)
+    print("Generating samples...")
+    generate_gaussian_vmap = vmap(lambda key: generate_non_gaussian(key, xi1, L, gain))
+    # t2 = timeit.timeit(lambda: generate_gaussian_vmap(keys, xi1, L, gain), number=1000)
+    t2 = timeit.timeit(lambda: generate_gaussian_vmap(keys), number=100)
     
-    # make ipr an array
-    iprs = np.array(iprs)
-        
-    # key
-    key = f'__xi1={xi1:05.2f}_xi2={xi2:05.2f}_gain={gain:05.2f}_L={L:03}_K={K:03}_dim={dim}_batch_size={batch_size}_num_epochs={num_epochs}_loss={loss}_lr={lr:.3f}_activation={activation}_second_layer={second_layer}'
-    print(f'key={key}')
-         
-    # save losses, accs, iprs
-    np.savez(f'{path}/results/metrics_{key}.npz', losses=losses, accs=accs, iprs=iprs)
-    print('Saved losses, accs, iprs')
-        
-    # save model weights
-    torch.save({k: v.cpu() for k, v in model.state_dict().items()}, f'{path}/results/weights_{key}.pt')
-    print('Saved model weights')
+    # chatgpt attempt
+    print("Generating samples the chatgpt way...")
+    t3 = timeit.timeit(lambda: generate_non_gaussian_chatgpt(keys, xi1, L, gain), number=100)
+    
+    print(f"Original: {t1}")
+    print(f"Vectorized: {t2}")
+    print(f"ChatGPT: {t3}")
         
 if __name__ == '__main__':
     

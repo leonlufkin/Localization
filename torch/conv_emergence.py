@@ -129,7 +129,14 @@ class NeuralNet(Model):
         self.ff2 = self.ff2.to(device)
         return self
 
+def generate_pulse(L, xi, g, dim=1, num_samples=1):
+    if dim > 1:
+        raise NotImplementedError("dim > 1 not implemented")
     
+    lengths = np.random.randint(0, xi, size=num_samples)
+    
+
+
 class NLGPDataset(Dataset):
     def __init__(self, L, xi1, xi2, g, dim=1, batch_size=1, num_epochs=1):
         self.L = L
@@ -258,11 +265,11 @@ def main(
     print(f'key={key}')
          
     # save losses, accs, iprs
-    np.savez(f'{path}/results/metrics_{key}.npz', losses=losses, accs=accs, iprs=iprs)
+    np.savez(f'{path}/../results/metrics_{key}.npz', losses=losses, accs=accs, iprs=iprs)
     print('Saved losses, accs, iprs')
         
     # save model weights
-    torch.save({k: v.cpu() for k, v in model.state_dict().items()}, f'{path}/results/weights_{key}.pt')
+    torch.save({k: v.cpu() for k, v in model.state_dict().items()}, f'{path}/../results/weights_{key}.pt')
     print('Saved model weights')
         
 if __name__ == '__main__':
