@@ -88,26 +88,51 @@ def main(
     # original
     key = jax.random.PRNGKey(0)
     print("Generating samples the original way...")
-    t1 = timeit.timeit(lambda: generate_non_gaussian_samples(key, xi1, L, gain, num_samples=batch_size), number=100)
+    t1 = timeit.timeit(lambda: generate_non_gaussian_samples(key, xi1, L, gain, num_samples=batch_size), number=1000)
     
     # attempt at vectorization
-    print("Generating samples the vectorized way...")
-    # generate_gaussian_vmap = vmap(generate_non_gaussian, in_axes=(0, None, None, None))
     print("Splitting keys...")
     keys = jax.random.split(jax.random.PRNGKey(0), batch_size)
-    print("Generating samples...")
-    generate_gaussian_vmap = vmap(lambda key: generate_non_gaussian(key, xi1, L, gain))
-    # t2 = timeit.timeit(lambda: generate_gaussian_vmap(keys, xi1, L, gain), number=1000)
-    t2 = timeit.timeit(lambda: generate_gaussian_vmap(keys), number=100)
-    
+
+    lambda_generate_non_gaussian = vmap(lambda key: generate_non_gaussian(key, xi1, L, gain))
+    jitted_lambda_generate_non_gaussian = jit(lambda_generate_non_gaussian)
+
+    from functools import partial
+    partial_generate_non_gaussian = vmap(partial(generate_non_gaussian, xi= xi1, L= L, g=gain))
+    jitted_partial_generate_non_gaussian = jit(partial_generate_non_gaussian)
+
+    # The "canonical" way to use `vmap` and `jit`:
+    in_axes_generate_non_gaussian = vmap(generate_non_gaussian, in_axes=(0, None, None, None))
+    jitted_in_axes_generate_non_gaussian = jit(in_axes_generate_non_gaussian, static_argnames=('xi', 'L', 'g'))
+
+    # Compile the `jit`ed functions before timing them.
+    jitted_lambda_generate_non_gaussian(keys)
+    jitted_partial_generate_non_gaussian(keys)
+    jitted_in_axes_generate_non_gaussian(keys, xi1, L, gain)
+
+    print("Generating samples the vectorized way...")
+    t2 = timeit.timeit(lambda: lambda_generate_non_gaussian(keys), number=1000)
+    t3 = timeit.timeit(lambda: partial_generate_non_gaussian(keys), number=1000)
+    t4 = timeit.timeit(lambda: in_axes_generate_non_gaussian(keys, xi1, L, gain), number=1000)
+
+    t5 = timeit.timeit(lambda: jitted_lambda_generate_non_gaussian(keys), number=1000)
+    t6 = timeit.timeit(lambda: jitted_partial_generate_non_gaussian(keys), number=1000)
+    t7 = timeit.timeit(lambda: jitted_in_axes_generate_non_gaussian(keys, xi1, L, gain), number=1000)
+
     # chatgpt attempt
     print("Generating samples the chatgpt way...")
-    t3 = timeit.timeit(lambda: generate_non_gaussian_chatgpt(keys, xi1, L, gain), number=100)
+    t8 = timeit.timeit(lambda: generate_non_gaussian_chatgpt(keys, xi1, L, gain), number=100)
     
     print(f"Original: {t1}")
-    print(f"Vectorized: {t2}")
-    print(f"ChatGPT: {t3}")
+    print(f"`vmap`-ed lambda: {t2}")
+    print(f"`vmap`-ed partial: {t3}")
+    print(f"`vmap`-ed in-axes: {t4}")
+    print(f"`jit`-ed and `vmap`-ed lambda: {t5}")
+    print(f"`jit`-ed and `vmap`-ed partial: {t6}")
+    print(f"`jit`-ed and `vmap`-ed in-axes: {t7}")
+    print(f"ChatGPT 🤡: {t8}")
         
+    
 if __name__ == '__main__':
     
     # get arguments
