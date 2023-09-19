@@ -99,7 +99,7 @@ This yields a sum over $\max(L - \xi, 1) \leq l^* \leq d$.
 Similarly, the second max condition is at least zero when $l^* \geq L - \xi + d$.
 This yields a sum over $\max( L - \xi + d, d+1) \leq l^* \leq L$.
 Note that the first term dominates in both of these new max statements when $\xi \leq L-1$.
-So, let us assume this case.
+So, let us assume this is the case.
 
 Now, we want to find the total number of values of $T$ that result in both $X_a$ and $X_b$ being in the pulse.
 \begin{align}
@@ -109,6 +109,7 @@ Now, we want to find the total number of values of $T$ that result in both $X_a$
   &= \sum_{ L - \xi + d \leq l^* \leq L } (\xi - L + l^* - d)
   = \sum_{ L - \xi \leq t \leq L - d } (\xi - L + t). \label{eq:T2}
 \end{align}
+% Let us assume $d \geq L - \xi$. % \iff \xi \geq L - d$.
 We compute $T_1$ as,
 % \begin{align*}
 %   T_1
@@ -119,8 +120,9 @@ We compute $T_1$ as,
 \begin{align*}
   T_1
   % &= (\xi - L) (d - (L-\xi) + 1) + \frac{d(d+1)}{2} - \frac{(L-\xi)(L-\xi-1)}{2} \\
-  &= (\xi - L) (d - L + \xi + 1) + \frac{d(d+1)}{2} - \frac{(L-\xi)(L-\xi-1)}{2}.
+  &= \left[ (\xi - L) (d - L + \xi + 1) + \frac{d(d+1)}{2} - \frac{(L-\xi)(L-\xi-1)}{2} \right] \mathbbm{1}(d \geq L - \xi).
 \end{align*}
+% Let us further assume $L - \xi + d \leq L \iff d \leq \xi$.
 Next, we compute $T_2$ as,
 % \begin{align*}
 %   T_2
@@ -130,7 +132,7 @@ Next, we compute $T_2$ as,
 \begin{align*}
   T_2
   % &= ((L - d) - (L - \xi) + 1) (\xi - L) + \frac{(L-d)(L-d+1)}{2} - \frac{(L-\xi)(L-\xi-1)}{2} \\
-  &= (\xi - d + 1) (\xi - L) + \frac{(L-d)(L-d+1)}{2} - \frac{(L-\xi)(L-\xi-1)}{2}.
+  &= \left[ (\xi - d + 1) (\xi - L) + \frac{(L-d)(L-d+1)}{2} - \frac{(L-\xi)(L-\xi-1)}{2} \right] \mathbbm{1}(d \leq \xi).
 \end{align*}
 Thus, the total number of values of $T$ that result in both $X_a$ and $X_b$ being in the pulse is
 % \begin{align}
@@ -144,11 +146,16 @@ Thus, the total number of values of $T$ that result in both $X_a$ and $X_b$ bein
   % &= (\xi - L) [ (d - L + \xi + 1) + (\xi - d + 1) ] + \frac{d(d+1)}{2} + \frac{(L-d)(L-d+1)}{2} - (L-\xi)(L-\xi-1) \\
   % &= (L - \xi) [(L-\xi-1) - (2\xi + 2- L)] + \frac{d(d+1)}{2} + \frac{(L-d)(L-d+1)}{2} \\
   % &= (L - \xi) (2L + \xi - 3) + \frac{d(d+1)}{2} + \frac{(L-d)(L-d+1)}{2} \\
-  &= d^2 - dL + \frac{L^2}{2} + \frac{L}{2} - (L-\xi) (\xi+1)
+  &= 
+  \begin{cases}
+    (\xi - d + 1) (\xi - L) + \frac{(L-d)(L-d+1)}{2} - \frac{(L-\xi)(L-\xi-1)}{2} & d \leq \xi, L - \xi + 1 \\
+    d^2 - dL + \frac{L^2}{2} + \frac{L}{2} - (L-\xi) (\xi+1) & L - \xi \leq d \leq \xi \\
+    (\xi - L) (d - L + \xi + 1) + \frac{d(d+1)}{2} - \frac{(L-\xi)(L-\xi-1)}{2} & d \geq L - \xi, \xi + 1
+  \end{cases}
 \end{align*}
 There are $\xi - 1$ possible values for $T$ and $L$ values for $l^*$.
 Recall we sample $T$ and $l^*$ uniformly and independently.
-Thus, the probability that $X_a = 1$ given $X_b = 1$ is
+Thus, the probability that $X_b = 1$ given $X_a = 1$ is
 \begin{align}
   p_{11}
   &= \frac{T_1 + T_2}{(\xi - 1) L}
@@ -157,7 +164,8 @@ Thus, the probability that $X_a = 1$ given $X_b = 1$ is
 \end{align}
 Note that we assumed $\xi \leq L-1$.
 However, we can check that the above expression is still valid when $\xi = L$.
-(Check Desmos. Otherwise, an exercise left to the reader.)
+(Check Desmos. 
+Otherwise, an exercise left to the reader.)
 It also satisfies the ``sanity check'' that it is minimized at $x = \frac{L}{2}$.
 
 
