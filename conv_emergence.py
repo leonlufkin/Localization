@@ -121,7 +121,7 @@ def main(
 
     # chatgpt attempt
     print("Generating samples the chatgpt way...")
-    t8 = timeit.timeit(lambda: generate_non_gaussian_chatgpt(keys, xi1, L, gain), number=100)
+    t8 = timeit.timeit(lambda: generate_non_gaussian_chatgpt(keys, xi1, L, gain), number=1000)
     
     print(f"Original: {t1}")
     print(f"`vmap`-ed lambda: {t2}")

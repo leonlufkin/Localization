@@ -15,6 +15,14 @@ from nets.datasets.base import ExemplarType
 
 from jax.scipy.special import erf as gain_function
 
+def slice_to_array(s: slice, array_length: int):
+  """Convert a `slice` object to an array of indices."""
+  start = s.start if s.start is not None else 0
+  stop = s.stop if s.stop is not None else array_length
+  step = s.step if s.step is not None else 1
+
+  return jnp.array(range(start, stop, step))
+
 
 class NonlinearGPDataset(Dataset):
   """Nonlinear Gaussian Process dataset."""
@@ -97,7 +105,30 @@ class NonlinearGPDataset(Dataset):
     )
     self.generate_xi2 = jax.jit(
         jax.vmap(
-            partial(generate_non_gaussian, xi=xi2, L=num_dimensions, g=gain)
+            partial(generate_non_gaussian, 
+                    xi=xi2, L=num_dimensions, g=gain)
+        )
+    )
+
+    def generate_non_gaussian(key, xi, L, g):
+        C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
+        C = jnp.exp(-C ** 2 / (xi ** 2))
+        z = jax.random.multivariate_normal(key, jnp.zeros(L), C)
+        x = gain_function(g * z) / Z(g)
+        return x
+
+    def generate_non_gaussian_branching(key, class_proportion, L, g):
+      label_key, exemplar_key = jax.random.split(key, 2)
+      label = jax.random.bernoulli(label_key, p=class_proportion)
+      xi = jnp.where(label, xi1, xi2)
+      exemplar = generate_non_gaussian(exemplar_key, xi, L, g)
+      return label, exemplar
+
+    self.generate_xi = jax.jit(
+    jax.vmap(
+            partial(generate_non_gaussian_branching, 
+                    class_proportion=0.5,
+                    L=num_dimensions, g=gain)
         )
     )
 
@@ -108,30 +139,32 @@ class NonlinearGPDataset(Dataset):
 
   def __getitem__(self, index: int | slice) -> ExemplarType:
     """Get the exemplar(s) and the corresponding label(s) at `index`."""
-    
+
+    if isinstance(index, slice):
+      # TODO(leonl): Deal with the case where `index.stop` is `None`.
+      if index.stop is None:
+        raise ValueError("Slice `index.stop` must be specified.")
+      index = slice_to_array(index, len(self))
+    else:
+      index = index
+
+    keys = jax.vmap(jax.random.fold_in, in_axes=(None, 0))(self.key, index)
     if isinstance(index, int):
-        key = jax.random.PRNGKey(index)
-        size = 1
-    elif isinstance(index, slice):
-        indices = jnp.arange(index.stop)[index]
-        key = jax.random.PRNGKey(indices.mean())
-        size = len(indices)
-    classes = jax.random.randint(key, size, 0, 2, dtype=jnp.int32)
-    num_xi1 = jnp.sum(classes)
-    num_xi2 = size - num_xi1
-    
-    key1, key2, key3 = jax.random.split(key, 3)
-    xi1_ = jnp.zeros((0, self.num_dimensions))
-    if num_xi1 > 0:
-        xi1_ = self.generate_xi1(jax.random.split(key1, num_xi1))
-    xi2_ = jnp.zeros((0, self.num_dimensions))
-    if num_xi2 > 0:
-        xi2_ = self.generate_xi2(jax.random.split(key2, num_xi2))
-    
-    exemplars = jnp.concatenate((xi1_, xi2_), axis=0)
-    labels = jnp.concatenate((jnp.ones(num_xi1), -jnp.ones(num_xi2)), axis=0)
-    perm = jax.random.permutation(key3, size)
-    exemplars = exemplars[perm]
-    labels = labels[perm]
+        keys = jnp.expand_dims(keys, axis=0)
+
+    exemplars, labels = self.generate_xi(
+        key=keys,
+    )
+
+    if isinstance(index, int):
+      exemplars = exemplars[0]
+      labels = labels[0]
 
     return exemplars, labels
+
+
+if __name__ =="__main__":
+    key = jax.random.PRNGKey(0)
+    dataset = NonlinearGPDataset(key=key, xi1=0.1, xi2=1.1, gain=1., num_dimensions=100)
+    print(dataset[:100])
+

@@ -84,6 +84,8 @@ class Dataset:
       num_exemplars_per_class: Number of exemplars per class to draw from the
           underlying dataset.
     """
+    self.key = key
+
     # self.num_train_classes = num_train_classes
     # self.num_valid_classes = num_valid_classes
     # self.num_test_classes = num_test_classes
