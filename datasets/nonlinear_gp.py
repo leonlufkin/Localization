@@ -122,7 +122,11 @@ class NonlinearGPDataset(Dataset):
       label = jax.random.bernoulli(label_key, p=class_proportion)
       xi = jnp.where(label, xi1, xi2)
       exemplar = generate_non_gaussian(exemplar_key, xi, L, g)
-      return label, exemplar
+    #   print(f"generate_non_gaussian_branching: exemplar.shape: {exemplar.shape}, label.shape: {label.shape}")
+    #   print(exemplar)
+    #   print(label)
+      label = 2 * jnp.float32(label) -1
+      return exemplar, label
 
     self.generate_xi = jax.jit(
     jax.vmap(
@@ -166,5 +170,16 @@ class NonlinearGPDataset(Dataset):
 if __name__ =="__main__":
     key = jax.random.PRNGKey(0)
     dataset = NonlinearGPDataset(key=key, xi1=0.1, xi2=1.1, gain=1., num_dimensions=100)
-    print(dataset[:100])
+    print(len(dataset))
+    print(dataset[:10])
+    from nets import samplers
+    sampler = samplers.EpochSampler(
+        key=key,
+        dataset=dataset,
+        num_epochs=1,
+    )
+    print(len(sampler))
+    print(sampler[:1][0])
+    print(sampler[:1][1])
+    print(sampler[:1][0].shape, sampler[:1][1].shape)
 

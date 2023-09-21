@@ -201,6 +201,7 @@ class SimpleNet(eqx.Module):
   def __call__(self, x: Array, *, key: KeyArray) -> Array:
     """Apply the MLP block to the input."""
     x = self.fc1(x)
+    print(self.act)
     x = self.act(x)
-    x = jnp.mean(x, axis=0).reshape(-1)
+    x = jnp.mean(x, axis=0)#.reshape(-1)
     return x

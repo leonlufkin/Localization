@@ -136,7 +136,7 @@ class Dataset:
 
   def __len__(self) -> int:
     """Number of exemplars in this `Dataset`."""
-    return 0 # len(self._exemplars)
+    return int(1e3) # len(self._exemplars)
 
 #   @property
 #   def num_classes(self) -> int:

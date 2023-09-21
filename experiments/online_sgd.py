@@ -30,6 +30,8 @@ from nets import samplers
 # from nets import models
 from models.feedforward import SimpleNet
 
+from tqdm import tqdm
+
 
 def accuracy(pred_y: Array, y: Array) -> Array:
   """Compute elementwise accuracy."""
@@ -45,6 +47,7 @@ def mse(pred_y: Array, y: Array) -> Array:
 def batcher(sampler: Sequence, batch_size: int) -> Generator[Sequence, None, None]:
   """Batch a sequence of examples."""
   n = len(sampler)
+  # print("batcher: n=", n)
   for i in range(0, n, batch_size):
     yield sampler[i : min(i + batch_size, n)]
 
@@ -55,6 +58,7 @@ def compute_loss(model: eqx.Module, x: Array, y: Array, key: KeyArray) -> Array:
   keys = jax.random.split(key, x.shape[0])
   pred_y = jax.vmap(model)(x, key=keys)
   loss = mse(pred_y, y)
+  # print(jnp.mean(jnp.abs(pred_y)).item())
   return loss.mean()
 
 
@@ -69,7 +73,11 @@ def train_step(
 ) -> tuple[Array, eqx.Module, Array]:
   """Train the model on a single example."""
   loss, grads = compute_loss(model, x, y, key)
+  # print("grads l2 norm: ", jnp.linalg.norm(grads(x, key=key)))
+  # print(grads)
   updates, opt_state = optimizer.update(grads, opt_state)
+  # print("updates", type(updates))
+  # print("opt_state", opt_state)
   model = eqx.apply_updates(model, updates)
   return loss, model, opt_state
 
@@ -82,15 +90,16 @@ def eval_step(
   model: eqx.Module,
 ) -> Mapping[str, Array]:
   """Evaluate the model on a single example-label pair."""
+  # print(f"eval_step: x.shape={x.shape}, y.shape={y.shape}")
   pred_y = model(x, key=key)
 
   # Standard metrics.
   elementwise_acc = accuracy(pred_y, y)
-  elementwise_loss = ce(pred_y, y)
+  elementwise_loss = mse(pred_y, y)
 
   # Random baseline.
-  c = pred_y.shape[-1]
-  random_baseline = 1.0 / c
+  # c = pred_y.shape[-1]
+  random_baseline = 0.5 #1.0 / c
 
   return {
     "loss": elementwise_loss.mean(),
@@ -183,6 +192,8 @@ def evaluate(
 
   # Probing metric shapes.
   num_examples = len(sampler)
+  # print("evaluate: num_examples=", num_examples)
+  # print(sampler[:1][0].shape, sampler[:1][1].shape)
   incremental_metrics = dict(
     (
       metric_name,
@@ -196,8 +207,9 @@ def evaluate(
   print("Starting evaluation...")
   start = time.time()
 
-  for i, (x, y) in enumerate(batcher(sampler, batch_size)):
-    (key,) = jax.random.split(key, 1)
+  for i, (x, y) in tqdm(enumerate(batcher(sampler, batch_size))):
+    # (key,) = jax.random.split(key, 1)
+    # print(f"evaluate: x.shape={x.shape}, y.shape={y.shape}")
     batch_metrics = _eval_step(x, y, jax.random.split(key, x.shape[0]))
     for metric_name in incremental_metrics.keys():
       incremental_metrics[metric_name][
@@ -224,7 +236,7 @@ def evaluate(
 def simulate(
   seed: int,
   # Model params.
-  num_ins: int,
+  # num_ins: int,
   num_hiddens: int,
   init_scale: float,
   # Training and evaluation params.
@@ -271,6 +283,8 @@ def simulate(
   if len(dataset) % batch_size != 0:
     raise ValueError("Batch size must evenly divide the number of training examples.")
 
+  # print(f"simulate: len(dataset)={len(dataset)}")
+
   sampler = sampler_cls(
     key=sampler_key,
     dataset=dataset,
@@ -288,7 +302,7 @@ def simulate(
 #     init_scale=init_scale,
 #   )
   model = SimpleNet(
-      in_features=num_ins,
+      in_features=num_dimensions, #num_ins,
       hidden_features=num_hiddens,
       out_features=1,
       act=jax.nn.tanh,
@@ -329,7 +343,7 @@ def simulate(
   for epoch in range(num_epochs):
     start_time = time.time()
 
-    for i, (x, y) in enumerate(batcher(sampler, batch_size)):
+    for i, (x, y) in tqdm(enumerate(batcher(sampler, batch_size))):
       i += epoch * len(sampler) // batch_size
 
       (train_key,) = jax.random.split(train_key, 1)
