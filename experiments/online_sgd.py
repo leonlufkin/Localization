@@ -42,8 +42,7 @@ def accuracy(pred_y: Array, y: Array) -> Array:
 
 def mse(pred_y: Array, y: Array) -> Array:
   """Compute elementwise mean squared error."""
-  pred_pos_neg_labels = jnp.array([-1, 1])[jnp.argmax(pred_y, axis=-1)]
-  return jnp.square(pred_pos_neg_labels - y)
+  return jnp.square(pred_y - y)
 
 
 def batcher(sampler: Sequence, batch_size: int) -> Generator[Sequence, None, None]:
@@ -306,7 +305,7 @@ def simulate(
   model = SimpleNet(
       in_features=num_dimensions, #num_ins,
       hidden_features=num_hiddens,
-      out_features=2,
+      out_features=1,
       act=jax.nn.tanh,
       key=model_key,
       init_scale=init_scale,
