@@ -192,16 +192,25 @@ class SimpleNet(eqx.Module):
 
     self.fc1 = Linear(
       in_features=in_features,
-      out_features=hidden_features,
+      out_features=out_features,
       key=key,
       init_scale=init_scale,
     )
     self.act = act
 
+    # TODO(leonl): Add an static layer with input dimension `hidden_features`.
+    del hidden_features
+
+
   def __call__(self, x: Array, *, key: KeyArray) -> Array:
     """Apply the MLP block to the input."""
     x = self.fc1(x)
-    print(self.act)
     x = self.act(x)
-    x = jnp.mean(x, axis=0)#.reshape(-1)
+
+    # TODO(leonl): Call the static layer with input dimension `hidden_features`.
+    #x = self.fc2(x)
+    #x = self.act(x)
+
+    #x = jnp.mean(x, axis=0)#.reshape(-1)
+
     return x

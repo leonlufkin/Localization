@@ -26,6 +26,7 @@ import optax
 
 # from nets import datasets
 from datasets.base import Dataset
+from datasets.nonlinear_gp import NonlinearGPDataset
 from nets import samplers
 # from nets import models
 from models.feedforward import SimpleNet
@@ -41,7 +42,8 @@ def accuracy(pred_y: Array, y: Array) -> Array:
 
 def mse(pred_y: Array, y: Array) -> Array:
   """Compute elementwise mean squared error."""
-  return jnp.square(pred_y - y).mean(axis=-1)
+  pred_pos_neg_labels = jnp.array([-1, 1])[jnp.argmax(pred_y, axis=-1)]
+  return jnp.square(pred_pos_neg_labels - y)
 
 
 def batcher(sampler: Sequence, batch_size: int) -> Generator[Sequence, None, None]:
@@ -304,7 +306,7 @@ def simulate(
   model = SimpleNet(
       in_features=num_dimensions, #num_ins,
       hidden_features=num_hiddens,
-      out_features=1,
+      out_features=2,
       act=jax.nn.tanh,
       key=model_key,
       init_scale=init_scale,
@@ -383,3 +385,21 @@ def simulate(
   )
 
   return df
+
+if __name__ == '__main__':
+
+  simulate(
+    seed=0,
+    num_hiddens=16,
+    init_scale=0.01,
+    optimizer_fn=optax.adam,
+    learning_rate=1e-3,
+    batch_size=20,
+    num_epochs=2,
+    dataset_cls=NonlinearGPDataset,
+    xi1=0.1,
+    xi2=1.0,
+    gain=1.0,
+    num_dimensions=8,
+    sampler_cls=samplers.EpochSampler,
+  ) 
