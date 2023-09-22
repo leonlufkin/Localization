@@ -30,13 +30,15 @@ from datasets.nonlinear_gp import NonlinearGPDataset
 from nets import samplers
 # from nets import models
 from models.feedforward import SimpleNet
+from nets import models
 
 from tqdm import tqdm
 
 
 def accuracy(pred_y: Array, y: Array) -> Array:
   """Compute elementwise accuracy."""
-  predicted_class = jnp.argmax(pred_y, axis=-1)
+  # print("accuracy: pred_y.shape=", pred_y.shape, "y.shape=", y.shape)
+  predicted_class = jnp.where(pred_y > 0, 1., -1) # jnp.argmax(pred_y, axis=-1)
   return predicted_class == y
 
 
@@ -58,6 +60,7 @@ def compute_loss(model: eqx.Module, x: Array, y: Array, key: KeyArray) -> Array:
   """Compute cross-entropy loss on a single example."""
   keys = jax.random.split(key, x.shape[0])
   pred_y = jax.vmap(model)(x, key=keys)
+  # import ipdb; ipdb.set_trace()
   loss = mse(pred_y, y)
   # print(jnp.mean(jnp.abs(pred_y)).item())
   return loss.mean()
@@ -97,6 +100,7 @@ def eval_step(
   # Standard metrics.
   elementwise_acc = accuracy(pred_y, y)
   elementwise_loss = mse(pred_y, y)
+  # import ipdb; ipdb.set_trace()
 
   # Random baseline.
   # c = pred_y.shape[-1]
@@ -118,9 +122,9 @@ def summarize_metrics(metrics):
       f"\t\t\t{metrics['loss'].mean(0)}"
       "\n\taccuracy:"
       f"\t\t{metrics['accuracy'].mean(0)}"
-      "\n\tBASELINE:"
-      f"\t\t{metrics['random baseline accuracy'].mean() * 100:.2f}%"
-      f"\n\tGT labels:\t\t{metrics['ground truth label']}"
+      # "\n\tBASELINE:"
+      # f"\t\t{metrics['random baseline accuracy'].mean() * 100:.2f}%"
+      # f"\n\tGT labels:\t\t{metrics['ground truth label']}"
     )
 
 
@@ -208,7 +212,7 @@ def evaluate(
   print("Starting evaluation...")
   start = time.time()
 
-  for i, (x, y) in tqdm(enumerate(batcher(sampler, batch_size))):
+  for i, (x, y) in enumerate(batcher(sampler, batch_size)):
     # (key,) = jax.random.split(key, 1)
     # print(f"evaluate: x.shape={x.shape}, y.shape={y.shape}")
     batch_metrics = _eval_step(x, y, jax.random.split(key, x.shape[0]))
@@ -269,39 +273,66 @@ def simulate(
   # Data setup.
   dataset_key, sampler_key = jax.random.split(data_key)
 
-  dataset = dataset_cls(
-    key=dataset_key,
+  train_dataset_key, eval_dataset_key = jax.random.split(dataset_key)
+  
+  train_dataset = dataset_cls(
+    key=train_dataset_key,
     xi1=xi1,
     xi2=xi2,
     gain=gain,
     num_dimensions=num_dimensions,
+    num_exemplars=batch_size,
   )
+  
+  eval_dataset = dataset_cls(
+    key=eval_dataset_key,
+    xi1=xi1,
+    xi2=xi2,
+    gain=gain,
+    num_dimensions=num_dimensions,
+    num_exemplars=20*batch_size,
+  )
+
+  print(f"Length of train dataset: {len(train_dataset)}")
+  print(f"Length of eval dataset: {len(eval_dataset)}")
 
   # `None` batch size implies full-batch optimization.
   if batch_size is None:
-    batch_size = len(dataset)
+    batch_size = len(train_dataset)
 
-  if len(dataset) % batch_size != 0:
+  if len(train_dataset) % batch_size != 0:
     raise ValueError("Batch size must evenly divide the number of training examples.")
 
   # print(f"simulate: len(dataset)={len(dataset)}")
 
-  sampler = sampler_cls(
-    key=sampler_key,
-    dataset=dataset,
+  train_sampler_key, eval_sampler_key = jax.random.split(sampler_key)
+
+  train_sampler = sampler_cls(
+    key=train_sampler_key,
+    dataset=train_dataset,
     num_epochs=max(num_epochs, 1),
   )
+  
+  eval_sampler = sampler_cls(
+    key=eval_sampler_key,
+    dataset=eval_dataset,
+    num_epochs=1,
+  )
+  
+  print(f"Length of train sampler: {len(train_sampler)}")
+  print(f"Length of eval sampler: {len(eval_sampler)}")
+    
 
   #########
   # Model setup.
-#   model = models.MLP(
-#     in_features=2,
-#     hidden_features=num_hiddens,
-#     out_features=2,
-#     act=jax.nn.relu,
-#     key=model_key,
-#     init_scale=init_scale,
-#   )
+  # model = models.MLP(
+  #   in_features=num_dimensions,
+  #   hidden_features=num_hiddens,
+  #   out_features=1,
+  #   act=jax.nn.relu,
+  #   key=model_key,
+  #   init_scale=init_scale,
+  # )
   model = SimpleNet(
       in_features=num_dimensions, #num_ins,
       hidden_features=num_hiddens,
@@ -327,7 +358,7 @@ def simulate(
     evaluate(
       iteration=0,
       dataset_split="eval",
-      sampler=sampler,
+      sampler=eval_sampler,
       model=eqx.tree_inference(model, True),
       key=eval_key,
       batch_size=batch_size,
@@ -336,37 +367,39 @@ def simulate(
 
   # Training starts at iteration 1.
   next(itercount)
-  evaluation_interval = len(sampler) // batch_size #// evaluations_per_epoch
+  evaluation_interval = 500 # len(train_sampler) // batch_size // 10
+  print(f"Evaluating every {evaluation_interval} training steps.")
   if evaluation_interval == 0:
     raise ValueError("Too many `evaluations_per_epoch`.")
 
   print("\nStarting training...")
-  for epoch in range(num_epochs):
-    start_time = time.time()
+  print(f"Length of train sampler: {len(train_sampler)}")
+  
+  start_time = time.time()
 
-    for i, (x, y) in tqdm(enumerate(batcher(sampler, batch_size))):
-      i += epoch * len(sampler) // batch_size
+  for epoch, (x, y) in enumerate(batcher(train_sampler, batch_size)):
+    (train_key,) = jax.random.split(train_key, 1)
+    train_step_num = int(next(itercount))
+    train_loss, model, opt_state = train_step(
+      model, optimizer, opt_state, x, y, train_key
+    )
 
-      (train_key,) = jax.random.split(train_key, 1)
-      train_step_num = int(next(itercount))
-      train_loss, model, opt_state = train_step(
-        model, optimizer, opt_state, x, y, train_key
-      )
-
-      if train_step_num % evaluation_interval == 0 or i + 1 == len(sampler):
-        metrics.append(
-          evaluate(
-            iteration=train_step_num,
-            dataset_split="eval",
-            sampler=sampler,
-            model=eqx.tree_inference(model, True),
-            key=eval_key,
-            batch_size=batch_size,
-          )
+    if train_step_num % evaluation_interval == 0:# or i + 1 == len(train_sampler):
+      epoch_time = time.time() - start_time
+      print(f"Epoch {train_step_num // evaluation_interval} in {epoch_time:0.2f} seconds.")
+      
+      metrics.append(
+        evaluate(
+          iteration=train_step_num,
+          dataset_split="eval",
+          sampler=eval_sampler,
+          model=eqx.tree_inference(model, True),
+          key=eval_key,
+          batch_size=batch_size,
         )
-
-    epoch_time = time.time() - start_time
-    print(f"Epoch {epoch} in {epoch_time:0.2f} seconds.")
+      )
+      
+      start_time = time.time()
 
   print("Training finished.")
 
@@ -389,16 +422,27 @@ if __name__ == '__main__':
 
   simulate(
     seed=0,
-    num_hiddens=16,
-    init_scale=0.01,
-    optimizer_fn=optax.adam,
-    learning_rate=1e-3,
-    batch_size=20,
-    num_epochs=2,
+    num_dimensions=40,
+    num_hiddens=100,
+    init_scale=1.,#0.01,
+    optimizer_fn=optax.sgd,
+    learning_rate=0.1,
+    batch_size=100,
+    num_epochs=20000,
     dataset_cls=NonlinearGPDataset,
-    xi1=0.1,
-    xi2=1.0,
-    gain=1.0,
-    num_dimensions=8,
+    xi1=10.,
+    xi2=0.1,
+    gain=1.1,
     sampler_cls=samplers.EpochSampler,
   ) 
+
+
+# lecun init
+# init_scale: 0.01, lr: 0.5 -> 0.5877/0.9272
+# init_scale: 0.01, lr: 1.0 -> 0.5848/0.8055
+# init_scale: 1.0 , lr: 1.0 -> 0.6149/0.9403 (after 5.5k epochs)
+# init_scale: 1.0 , lr: 2.5 -> 0.5782/0.9486 (after 12k epochs)
+# init_scale: 1.0 , lr: 10. -> 0.5710/0.9483 (after 6.5k epochs)
+
+# xavier init
+# init_scale: 1.0 , lr: 10. -> 

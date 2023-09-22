@@ -224,6 +224,12 @@ def main(
     model = NeuralNet(input_dim=L ** dim, hidden_dim=K, activation=activation_fn, second_layer=second_layer)
     opt = torch.optim.SGD(model.parameters(), lr=lr)
 
+    # save initial weights
+    weight = model.ff1.weight.data.detach().cpu().numpy()
+    bias = model.ff1.bias.data.detach().cpu().numpy()
+    np.savez(f'{path}/initial_weights.npz', weight=weight, bias=bias)
+    return
+
     # set up data
     loader = NLGPLoader(L, xi1, xi2, gain, dim, batch_size=batch_size, num_epochs=num_epochs, shuffle=False, num_workers=0)
     loss_fn = nn.MSELoss() if loss == 'mse' else nn.BCEWithLogitsLoss()

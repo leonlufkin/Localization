@@ -41,10 +41,12 @@ class NonlinearGPDataset(Dataset):
     # split: DatasetSplit = DatasetSplit.TRAIN,
     # exemplar_labeling: ExemplarLabeling = ExemplarLabeling.STANDARD,
     # holdout_class_labeling: HoldoutClassLabeling = HoldoutClassLabeling.STANDARD,
+    num_exemplars: int = 1000,
   ):
     """Initializes a `NonlinearGPDataset` instance."""
     super().__init__(
       key=key,  # TODO(eringrant): Use a separate key.
+      num_exemplars=num_exemplars,
     #   split=split,
     #   exemplar_labeling=exemplar_labeling,
     #   holdout_class_labeling=holdout_class_labeling,
@@ -94,38 +96,39 @@ class NonlinearGPDataset(Dataset):
     def generate_non_gaussian(key, xi, L, g):
         C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
         C = jnp.exp(-C ** 2 / (xi ** 2))
-        z = jax.random.multivariate_normal(key, jnp.zeros(L), C)
+        z = jax.random.multivariate_normal(key, jnp.zeros(L), C, method="svd") # FIXME: using svd for numerical stability, breaks if xi > 2.5 ish
         x = gain_function(g * z) / Z(g)
         return x
     
-    self.generate_xi1 = jax.jit(
-        jax.vmap(
-            partial(generate_non_gaussian, xi=xi1, L=num_dimensions, g=gain)
-        )
-    )
-    self.generate_xi2 = jax.jit(
-        jax.vmap(
-            partial(generate_non_gaussian, 
-                    xi=xi2, L=num_dimensions, g=gain)
-        )
-    )
+    # self.generate_xi1 = jax.jit(
+    #     jax.vmap(
+    #         partial(generate_non_gaussian, xi=xi1, L=num_dimensions, g=gain)
+    #     )
+    # )
+    # self.generate_xi2 = jax.jit(
+    #     jax.vmap(
+    #         partial(generate_non_gaussian, 
+    #                 xi=xi2, L=num_dimensions, g=gain)
+    #     )
+    # )
 
-    def generate_non_gaussian(key, xi, L, g):
-        C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
-        C = jnp.exp(-C ** 2 / (xi ** 2))
-        z = jax.random.multivariate_normal(key, jnp.zeros(L), C)
-        x = gain_function(g * z) / Z(g)
-        return x
+    # def generate_non_gaussian(key, xi, L, g):
+    #     C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
+    #     C = jnp.exp(-C ** 2 / (xi ** 2))
+    #     z = jax.random.multivariate_normal(key, jnp.zeros(L), C)
+    #     x = gain_function(g * z) / Z(g)
+    #     return x
 
     def generate_non_gaussian_branching(key, class_proportion, L, g):
       label_key, exemplar_key = jax.random.split(key, 2)
       label = jax.random.bernoulli(label_key, p=class_proportion)
       xi = jnp.where(label, xi1, xi2)
       exemplar = generate_non_gaussian(exemplar_key, xi, L, g)
+    #   import ipdb; ipdb.set_trace()
     #   print(f"generate_non_gaussian_branching: exemplar.shape: {exemplar.shape}, label.shape: {label.shape}")
     #   print(exemplar)
     #   print(label)
-      label = 2 * jnp.float32(label) -1
+      label = 2 * jnp.float32(label) - 1
       return exemplar, label
 
     self.generate_xi = jax.jit(

@@ -48,6 +48,8 @@ class Dataset:
 #   num_valid_classes: int
 #   prop_valid_labels: float
 
+  num_exemplars: int
+
   def __init__(
     self,
     key: KeyArray,
@@ -59,6 +61,7 @@ class Dataset:
     # num_valid_classes: int = 0,
     # prop_valid_labels: float = 0,
     # num_exemplars_per_class: int = 400,
+    num_exemplars=1000
   ):
     """A `Dataset` of class exemplars from which to draw sequences.
 
@@ -85,6 +88,7 @@ class Dataset:
           underlying dataset.
     """
     self.key = key
+    self.num_exemplars = num_exemplars
 
     # self.num_train_classes = num_train_classes
     # self.num_valid_classes = num_valid_classes
@@ -136,7 +140,7 @@ class Dataset:
 
   def __len__(self) -> int:
     """Number of exemplars in this `Dataset`."""
-    return int(1e3) # len(self._exemplars)
+    return self.num_exemplars # len(self._exemplars)
 
 #   @property
 #   def num_classes(self) -> int:

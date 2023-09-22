@@ -46,6 +46,26 @@ def lecun_normal_init(
 
   return trunc_normal_init(weight, key, stddev=stddev)
 
+def xavier_normal_init(
+  weight: Array,
+  key: KeyArray,
+  scale: float = 1.0,
+):
+  xavier = jax.nn.initializers.glorot_normal()
+  stddev = np.sqrt(scale)
+  return stddev * xavier(key, weight.shape)
+
+def leon_torch_init(
+  weight: Array,
+  key: KeyArray,
+  scale: float = 1.0,
+):
+  K, L = weight.shape
+  assert K == 100 and L == 40
+  torch_init = np.load('initial_weights.npz', allow_pickle=True)
+  weight, bias = torch_init['weight'], torch_init['bias']
+  print("Loaded initial weights from torch.")
+  return weight
 
 class StopGradient(eqx.Module):
   """Stop gradient wrapper."""
@@ -79,7 +99,7 @@ class Linear(enn.Linear):
     )
 
     # Reinitialize weight from variance scaling distribution, reusing `key`.
-    self.weight: Array = lecun_normal_init(self.weight, key=key, scale=init_scale)
+    self.weight: Array = leon_torch_init(self.weight, key=key, scale=init_scale)
     if not trainable:
       self.weight = StopGradient(self.weight)
 
@@ -192,7 +212,7 @@ class SimpleNet(eqx.Module):
 
     self.fc1 = Linear(
       in_features=in_features,
-      out_features=out_features,
+      out_features=hidden_features,
       key=key,
       init_scale=init_scale,
     )
@@ -211,6 +231,6 @@ class SimpleNet(eqx.Module):
     #x = self.fc2(x)
     #x = self.act(x)
 
-    #x = jnp.mean(x, axis=0)#.reshape(-1)
+    x = jnp.mean(x)#, axis=0)#.reshape(-1)
 
     return x

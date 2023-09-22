@@ -169,6 +169,53 @@ Otherwise, an exercise left to the reader.)
 It also satisfies the ``sanity check'' that it is minimized at $x = \frac{L}{2}$.
 
 
+\section{Nonlinear Gaussian Process}
+We now consider the nonlinear Gaussian process (NLGP) data model.
+Define a covariance matrix $C$ with entries $C_{ij} = \exp(-(i-j)^2/\xi^2)$ for $i,j \in [L]$.
+Let $Z = [Z_1, \ldots, Z_L] \sim \mathcal{N}(0, C)$.
+Then, $Z$ is a Gaussian process with covariance $C$.
+Consider a nonlinearity $\psi$.
+We specifically consider the error function, $\psi(z) = \text{erf}(z / \sqrt{2})$.
+Define $X_i = \psi(g Z_i)$ for $i \in [L]$ and some $g > 0$.
+Then, $X$ is a nonlinear Gaussian process (NLGP).
+
+Now, we will compute the moments of $X$.
+Each $X_i$ clearly has mean zero.
+To compute higher moments, we will need to employ some handy properties of the error function.
+Assume $Z_1$ and $Z_2$ have covariance $\rho$.
+First, note
+\begin{align}
+  \E[ X_1 X_2 ]
+  &= \E_{X_1}\left[ \E_{X_2}\left[ X_1 X_2 \mid X_1 \right] \right] && \text{Law of Total Expectation} \\
+  &= \E_{X_1}\left[ X_1 \E_{X_2}\left[ X_2 \mid Z_1 \right] \right]. && \text{$\psi$ invertible}
+\end{align}
+Now, we compute the inner expectation.
+\begin{align}
+  \E_{X_2}\left[ X_2 \mid Z_1 \right]
+  &= \E_{Z_2}\left[ \psi(g Z_2) \mid Z_1 \right] \\
+  &= \int_{-\infty}^{\infty} \text{erf}\left( \frac{g z}{\sqrt{2}} \right) \frac{1}{\sqrt{2\pi \sigma^2}} e^{-\frac{1}{2 \sigma^2} \left( z - \mu \right)^2} dz && \mu = \rho Z_1, \sigma^2 = 1 - \rho^2 \\
+  &= \text{erf}\left( \frac{ g \mu / \sqrt{2} }{ \sqrt{ 1 + g^2 \sigma^2 } } \right) \\
+  &= \text{erf}\left( \frac{ \rho g }{ \sqrt{ 2( 1 + g^2 (1 - \rho^2) ) } } Z_1 \right).
+  % = \text{erf} \left( \frac{ \sqrt{\rho} Z_1 / \sqrt{2 g} }{ \sqrt{ 1 + 2(1-\rho^2) } } \right). && \text{Wikipedia-assisted}
+\end{align}
+Now, the outer expectation
+\begin{align}
+  &\E_{X_1} \left[  X_1 \text{erf}\left( \frac{ \rho g }{ \sqrt{ 2( 1 + g^2 (1 - \rho^2) ) } } Z_1 \right) \right] \\
+  &= \E_{Z_1} \left[ \text{erf} \left( \frac{g Z_1}{\sqrt{2}} \right) \text{erf}\left( \frac{ \rho g }{ \sqrt{ 2( 1 + g^2 (1 - \rho^2) ) } } Z_1 \right) \right] \\
+  &= \int_{-\infty}^{\infty} \frac{1}{\sqrt{2\pi}} e^{-\frac{1}{2} z^2} \text{erf} \left( \frac{g}{\sqrt{2}} z \right) \text{erf}\left( \frac{ \rho g }{ \sqrt{ 2( 1 + g^2 (1 - \rho^2) ) } } z \right) dz \\
+  &= \frac{2}{\sqrt{2 \pi}} \int_{0}^{\infty} e^{-\frac{1}{2} z^2} \text{erf} \left( \frac{g}{\sqrt{2}} z \right) \text{erf}\left( \frac{ \rho g }{ \sqrt{ 2( 1 + g^2 (1 - \rho^2) ) } } z \right) dz && \text{integrand is even} \\
+  &= \frac{2}{\pi} \tan^{-1} \left( \frac{ \frac{g}{\sqrt{2}} \cdot \frac{ \rho g }{ \sqrt{ 2( 1 + g^2 (1 - \rho^2) ) } } }{ \sqrt{ \frac{1}{2} \left( \frac{g^2}{2} + \frac{ \rho^2 g^2 }{ 2( 1 + g^2 (1 - \rho^2) ) } + \frac{1}{2} \right) } } \right) && \text{Prudnikov et al. (1990)} \\
+  % &= \frac{2}{\pi} \tan^{-1} \left( \frac{ \frac{ \rho g^2 }{ 2 \sqrt{ 1 + g^2 (1 - \rho^2) } } }{ \sqrt{ \frac{1}{2} \left( \frac{g^2}{2} + \frac{ \rho^2 g^2 }{ 2( 1 + g^2 (1 - \rho^2) ) } + \frac{1}{2} \right) } } \right)
+  &= \frac{2}{\pi}\sin^{-1}\left(\frac{g^{2}}{1+g^{2}}\rho\right). && \text{I promise}
+\end{align}
+
+We use the same idea to compute a third-order moment,
+\begin{align}
+  \E[ X_1 X_2 X_3 ]
+  &= \E_{X_1}\left[ \E_{X_2} \left[ \E_{X_3}\left[ X_1 X_2 X_3 \mid X_2 \right] \mid X_2 \right] \right] && \text{Law of Total Expectation} \\
+  &= \E_{X_1}\left[  X_1 \E_{X_2} \left[ X_2 \E_{X_3}\left[ X_3 \mid X_2 \right] \mid X_2 \right] \right].
+\end{align}
+
 
 
 

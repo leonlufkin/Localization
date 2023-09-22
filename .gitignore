@@ -1,3 +1,9 @@
+# LEON'S IGNORE LIST
+leonl/figs
+leonl/results
+leonl/logs
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
