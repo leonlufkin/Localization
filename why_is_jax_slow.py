@@ -44,11 +44,24 @@ if __name__ == '__main__':
   print(f"PyTorch took {torch_time:.2f} seconds.")
   print("##############################################\n")
 
-  # run it with JAX (slow??)
-  start_time = time.time()
-  simulate_jax(wandb_=False, **config) # wandb_=True would log results to Weights & Biases
-  jax_time = time.time() - start_time
-  print("\n##############################################")
-  print(f"JAX took {jax_time:.2f} seconds.")
-  print("##############################################\n")
+  ## run it with JAX (slow??)
+  #start_time = time.time()
+  #simulate_jax(wandb_=False, **config) # wandb_=True would log results to Weights & Biases
+  #jax_time = time.time() - start_time
+  #print("\n##############################################")
+  #print(f"JAX took {jax_time:.2f} seconds.")
+  #print("##############################################\n")
+
+  import cProfile
+  cProfile.runctx('simulate_jax(wandb_=False, **config)', 
+                  locals={},
+                   globals={'config': config, 'simulate_jax': simulate_jax},
+                  filename='jax_stats',
+                  )
+
+
+  import pstats
+  p = pstats.Stats('jax_stats')
+  from pstats import SortKey
+  p.sort_stats(SortKey.CUMULATIVE).print_stats(.01)
   

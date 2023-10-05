@@ -188,6 +188,12 @@ class EpochSampler(SingletonSampler):
 
     self.dataset_size = len(self.dataset)
 
+    self.permute_dataset_index = jax.jit(
+        partial(
+          jax.random.permutation,
+          x=jnp.arange(self.dataset_size),
+        ))
+
   def __len__(self) -> int:
     """Return the number of example-label pairs in `Sampler`."""
     if self.num_epochs is None:
@@ -214,11 +220,9 @@ class EpochSampler(SingletonSampler):
     if self.num_epochs is not None and epoch_idx >= self.num_epochs:
       raise StopIteration("Reached the end of data generation.")
 
-    epoch_key = jax.random.fold_in(self.key, epoch_idx)
-    permuted_index = jax.random.permutation(
-      epoch_key,
-      jnp.arange(self.dataset_size),
-    )[index_in_epoch]
+    #epoch_key = jax.random.fold_in(self.key, epoch_idx)
+    #permuted_index = self.permute_dataset_index(epoch_key)[index_in_epoch]
+    permuted_index = index_in_epoch
 
     return self.dataset[permuted_index]
 
