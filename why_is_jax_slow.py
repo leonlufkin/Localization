@@ -21,12 +21,12 @@ if __name__ == '__main__':
     optimizer_fn=optax.sgd,
     learning_rate=1.0,
     batch_size=5000,
-    num_epochs=200,
+    num_epochs=200,#0,
     dataset_cls=datasets.NonlinearGPDataset,
     xi1=4.47,
     xi2=0.1,
     class_proportion=0.5,
-    sampler_cls=samplers.EpochSampler,
+    sampler_cls=samplers.OnlineSampler,
     init_fn=models.torch_init,
     save_=False, # if True, will create a bunch of local files
     dim=1, # only the PyTorch version needs this
@@ -36,6 +36,7 @@ if __name__ == '__main__':
   config_torch = config.copy()
   config_torch['L'] = config_torch.pop('num_dimensions')
   config_torch['K'] = config_torch.pop('num_hiddens')
+  config_torch['lr'] = config_torch.pop('learning_rate')
   config_torch['second_layer'] = 0.0
   start_time = time.time()
   simulate_torch(**config_torch)

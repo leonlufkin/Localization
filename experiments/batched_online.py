@@ -30,7 +30,8 @@ import optax
 # from nets import datasets
 # export PYTHONPATH="${PYTHONPATH}:./"
 import datasets
-from nets import samplers
+# from nets import samplers
+import samplers
 import models
 
 
@@ -231,7 +232,7 @@ def simulate(
   model_cls: type[eqx.Module] = models.MLP,
   init_fn: Callable = models.xavier_normal_init,
   optimizer_fn: Callable = optax.sgd,
-  sampler_cls: type[samplers.EpochSampler] = samplers.EpochSampler,
+  sampler_cls: type[samplers.Sampler] = samplers.OnlineSampler,
   wandb_: bool = False,
   save_: bool = True,
   **kwargs, # extra kwargs
@@ -337,13 +338,13 @@ def simulate(
   train_sampler = sampler_cls(
     key=train_sampler_key,
     dataset=train_dataset,
-    num_epochs=1,
+    # num_epochs=1,
   )
   
   eval_sampler = sampler_cls(
     key=eval_sampler_key,
     dataset=eval_dataset,
-    num_epochs=1,
+    # num_epochs=1,
   )
   
   print(f"Length of train sampler: {len(train_sampler)}")

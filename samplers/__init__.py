@@ -6,6 +6,7 @@ from .base import SingletonSampler
 from .base import EpochSampler
 from .base import ClassificationSequenceSampler
 from .dirichlet_multinomial import DirichletMultinomialSampler
+from .leon_sampler import LeonSampler as OnlineSampler
 
 __all__ = (
   "QueryType",
@@ -15,4 +16,5 @@ __all__ = (
   "EpochSampler",
   "ClassificationSequenceSampler",
   "DirichletMultinomialSampler",
+  "OnlineSampler",
 )

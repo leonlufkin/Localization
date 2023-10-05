@@ -27,11 +27,13 @@ def generate_pulse(key, xi_lower, xi_upper, L):
     return 2 * X - 1
         
 def generate_pulse_branching(key, xi1_lower, xi1_upper, xi2_lower, xi2_upper, class_proportion, L):
-  label_key, exemplar_key = jax.random.split(key, 2)
+  label_key, exemplar_key, sign_key = jax.random.split(key, 3)
   label = jax.random.bernoulli(label_key, p=class_proportion)
   xi_lower = jnp.where(label, xi1_lower, xi2_lower)
   xi_upper = jnp.where(label, xi1_upper, xi2_upper)
-  exemplar = generate_pulse(exemplar_key, xi_lower, xi_upper, L)
+  sign = 2 * jax.random.bernoulli(sign_key, p=0.5) - 1
+  exemplar = sign * generate_pulse(exemplar_key, xi_lower, xi_upper, L)
+  # exemplar = generate_pulse(exemplar_key, xi_lower, xi_upper, L)
   label = 2 * jnp.float32(label) - 1
   return exemplar, label
 
@@ -55,10 +57,8 @@ class SinglePulseDataset(Dataset):
     Parameters
     ----------
     key: jax PRNG Key
-    xi1_lower: lower bound of interval to sample class 1's length scale from (inclusive)
-    xi1_upper: upper bound of interval to sample class 1's length scale from (exclusive)
-    xi2_lower: lower bound of interval to sample class -1's length scale from (inclusive)
-    xi2_upper: upper bound of interval to sample class -1's length scale from (exclusive)
+    xi1: lower/upper bound of interval to sample class 1's length scale from (inclusive/exclusive)
+    xi2: lower/upper bound of interval to sample class -1's length scale from (inclusive/exclusive)
     class_proportion: proportion of examples to draw from class 1
     num_dimension: dimension of exemplars generated
     num_exemplars: number of distinct exemplars to generate

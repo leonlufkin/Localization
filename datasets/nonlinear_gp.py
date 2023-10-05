@@ -16,6 +16,16 @@ from nets.datasets.base import ExemplarType
 
 from jax.scipy.special import erf as gain_function
 
+from line_profiler import LineProfiler
+
+profiler = LineProfiler()
+def profile(func):
+    def inner(*args, **kwargs):
+        profiler.add_function(func)
+        profiler.enable_by_count()
+        return func(*args, **kwargs)
+    return inner
+
 def slice_to_array(s: slice, array_length: int):
   """Convert a `slice` object to an array of indices."""
   start = s.start if s.start is not None else 0
@@ -52,6 +62,7 @@ class NonlinearGPDataset(Dataset):
     def Z(g):
         return jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (g**2) / (1 + (g**2)) ) )
     
+    # @profile
     def generate_non_gaussian(key, xi, L, g):
         C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
         C = jnp.exp(-C ** 2 / (xi ** 2))
@@ -59,27 +70,49 @@ class NonlinearGPDataset(Dataset):
         x = gain_function(g * z) / Z(g)
         return x
 
-    def generate_non_gaussian_branching(key, class_proportion, L, g):
+    # @profile
+    def generate_non_gaussian_branching(key, class_proportion, L, g, xi1, xi2):
       label_key, exemplar_key = jax.random.split(key, 2)
       label = jax.random.bernoulli(label_key, p=class_proportion)
       xi = jnp.where(label, xi1, xi2)
+      # label = 1.
+      # xi = xi1
       exemplar = generate_non_gaussian(exemplar_key, xi, L, g)
       label = 2 * jnp.float32(label) - 1
       return exemplar, label
 
     self.generate_xi = jax.jit(
-    jax.vmap(
+      jax.vmap(
             partial(generate_non_gaussian_branching, 
                     class_proportion=class_proportion,
-                    L=num_dimensions, g=gain)
+                    L=num_dimensions, g=gain,
+                    xi1=xi1, xi2=xi2
+                    ),
         )
     )
+    
+    # self.generate_xi1 = jax.jit(
+    #   jax.vmap(
+    #     partial(generate_non_gaussian,
+    #             xi=xi1, L=num_dimensions, g=gain,
+    #             ),
+    #   )
+    # )
+    # self.generate_xi2 = jax.jit(
+    #   jax.vmap(
+    #     partial(generate_non_gaussian,
+    #             xi=xi2, L=num_dimensions, g=gain,
+    #             ),
+    #   )
+    # )
+    
 
   @property
   def exemplar_shape(self) -> tuple[int]:
     """Returns the shape of an exemplar."""
     return (self.num_dimensions,)
 
+  # @profile
   def __getitem__(self, index: int | slice) -> ExemplarType:
     """Get the exemplar(s) and the corresponding label(s) at `index`."""
 
@@ -94,6 +127,7 @@ class NonlinearGPDataset(Dataset):
     keys = jax.vmap(jax.random.fold_in, in_axes=(None, 0))(self.key, index)
     if isinstance(index, int):
         keys = jnp.expand_dims(keys, axis=0)
+    xis = jax.random.bernoulli(keys, p=0.5)
 
     exemplars, labels = self.generate_xi(
         key=keys,
@@ -108,17 +142,47 @@ class NonlinearGPDataset(Dataset):
 
 if __name__ =="__main__":
     key = jax.random.PRNGKey(0)
-    dataset = NonlinearGPDataset(key=key, xi1=0.1, xi2=1.1, gain=1., num_dimensions=100)
+    dataset = NonlinearGPDataset(key=key, xi1=0.1, xi2=1.1, gain=1., num_dimensions=100, num_exemplars=1e4)
+    batch_size = 1000
     print(len(dataset))
-    print(dataset[:10])
-    from nets import samplers
-    sampler = samplers.EpochSampler(
-        key=key,
-        dataset=dataset,
-        num_epochs=1,
-    )
-    print(len(sampler))
-    print(sampler[:1][0])
-    print(sampler[:1][1])
-    print(sampler[:1][0].shape, sampler[:1][1].shape)
+    # import time
+    # start_time = time.time()
+    # def run_(dataset, batch_size):
+      # for i in range(0, len(dataset), batch_size):
+      #   x, y = dataset[i:i+batch_size]
+    # print("--- %s seconds ---" % (time.time() - start_time))
+    
+    # import cProfile
+    # cProfile.runctx('run_(dataset, batch_size)', 
+    #                 locals={},
+    #                 globals={'run_': run_, 'dataset': dataset, 'batch_size': batch_size},
+    #                 filename='nlgp_jax_stats',
+    #                 )
+    
+    # cProfile.run('dataset.__getitem__(slice(0, len(dataset)))', 
+    #                 # locals={},
+    #                 # globals={'dataset': dataset, },
+    #                 filename='nlgp_jax_stats',
+    #                 )
+
+    # import pstats
+    # p = pstats.Stats('nlgp_jax_stats')
+    # from pstats import SortKey
+    # p.sort_stats(SortKey.CUMULATIVE).print_stats(.01)
+    
+    # dataset.__getitem__(slice(0, len(dataset)))
+    for i in range(0, len(dataset), batch_size):
+      x, y = dataset.__getitem__(slice(i, i+batch_size))
+    print(profiler.print_stats())
+    
+    # from nets import samplers
+    # sampler = samplers.EpochSampler(
+    #     key=key,
+    #     dataset=dataset,
+    #     num_epochs=1,
+    # )
+    # print(len(sampler))
+    # print(sampler[:1][0])
+    # print(sampler[:1][1])
+    # print(sampler[:1][0].shape, sampler[:1][1].shape)
 

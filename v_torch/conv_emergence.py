@@ -226,6 +226,11 @@ def main(
     activation='tanh', second_layer='linear',
     path='.', save_=True, **kwargs
 ):
+    # pring args
+    print("Arguments:")
+    for arg, val in locals().items():
+        print(f"{arg}: {val}")
+    
     # set up model
     activation_fn = nn.Tanh() if activation == 'tanh' else nn.Sigmoid() if activation == 'sigmoid' else nn.ReLU()
     model = NeuralNet(input_dim=L ** dim, hidden_dim=K, activation=activation_fn, second_layer=second_layer)
@@ -245,7 +250,7 @@ def main(
     losses = np.zeros(num_epochs)
     accs = np.zeros(num_epochs)
     iprs = []
-    every_epoch = min(max(num_epochs // 100, 1), 500)
+    every_epoch = min(max(num_epochs // 10, 1), 500) # 10 was 100
     for epoch, (X, y) in enumerate(loader):
         X, y = X.squeeze(0), y.squeeze(0)
         yhat = model(X)
@@ -290,9 +295,9 @@ if __name__ == '__main__':
     
     # get arguments
     kwargs = parse_args()
-    print("Arguments:")
-    for arg, val in kwargs.items():
-        print(f"{arg}: {val}")
+    # print("Arguments:")
+    # for arg, val in kwargs.items():
+    #     print(f"{arg}: {val}")
     
     # main    
     main(**kwargs)
