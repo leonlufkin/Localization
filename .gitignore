@@ -2,6 +2,8 @@
 leonl/figs
 leonl/results
 leonl/logs
+results/*
+wandb/*
 
 
 # Byte-compiled / optimized / DLL files

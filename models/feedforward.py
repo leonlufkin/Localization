@@ -55,17 +55,37 @@ def xavier_normal_init(
   stddev = np.sqrt(scale)
   return stddev * xavier(key, weight.shape)
 
-def leon_torch_init(
+def torch_init(
   weight: Array,
   key: KeyArray,
   scale: float = 1.0,
 ):
   K, L = weight.shape
   assert K == 100 and L == 40
-  torch_init = np.load('initial_weights.npz', allow_pickle=True)
+  torch_init = jnp.load('weights/torch_weights.npz', allow_pickle=True)
   weight, bias = torch_init['weight'], torch_init['bias']
-  print("Loaded initial weights from torch.")
+  print("Loaded torch weights.")
   return weight
+
+def pretrained_init(
+  weight: Array,
+  key: KeyArray,
+  scale: float = 1.0,
+):
+  K, L = weight.shape
+  weight = jnp.load(f'weights/pretrained_weights_L={L}_K={K}.npy')
+  print("Loaded pretrained weights for L={L}, K={K}.")
+  return jnp.sqrt(scale) * weight
+
+def pruned_init(
+  weight: Array,
+  key: KeyArray,
+  scale: float = 1.0,
+):
+  K, L = weight.shape
+  weight = jnp.load(f'weights/pruned_weights_L={L}_K={K}.npy')
+  print("Loaded pruned weights for L={L}, K={K}.")
+  return jnp.sqrt(scale) * weight
 
 class StopGradient(eqx.Module):
   """Stop gradient wrapper."""
@@ -89,6 +109,7 @@ class Linear(enn.Linear):
     *,
     key: KeyArray,
     init_scale: float = 1.0,
+    init_fn: Callable = xavier_normal_init,
   ):
     """Initialize a linear layer."""
     super().__init__(
@@ -99,7 +120,7 @@ class Linear(enn.Linear):
     )
 
     # Reinitialize weight from variance scaling distribution, reusing `key`.
-    self.weight: Array = leon_torch_init(self.weight, key=key, scale=init_scale)
+    self.weight: Array = init_fn(self.weight, key=key, scale=init_scale) # xavier_normal_init
     if not trainable:
       self.weight = StopGradient(self.weight)
 
@@ -116,20 +137,19 @@ class MLP(eqx.Module):
 
   fc1: eqx.Module
   act: Callable
-  drop1: enn.Dropout
   fc2: eqx.Module
-  drop2: enn.Dropout
+  tanh: Callable
 
   def __init__(
     self,
     in_features: int,
     hidden_features: int | None = None,
-    out_features: int | None = None,
+    out_features: int | None = 1,
     act: Callable = lambda x: x,
-    drop: float | tuple[float] = 0.0,
     *,
     key: KeyArray = None,
     init_scale: float = 1.0,
+    **linear_kwargs,
   ):
     """Initialize an MLP.
 
@@ -146,7 +166,6 @@ class MLP(eqx.Module):
     super().__init__()
     out_features = out_features or in_features
     hidden_features = hidden_features or in_features
-    drop_probs = drop if isinstance(drop, tuple) else (drop, drop)
     keys = jrandom.split(key, 2)
 
     self.fc1 = Linear(
@@ -154,25 +173,24 @@ class MLP(eqx.Module):
       out_features=hidden_features,
       key=keys[0],
       init_scale=init_scale,
+      **linear_kwargs,
     )
     self.act = act
-    self.drop1 = enn.Dropout(drop_probs[0])
     self.fc2 = Linear(
       in_features=hidden_features,
       out_features=out_features,
       key=keys[1],
       init_scale=init_scale,
+      **linear_kwargs,
     )
-    self.drop2 = enn.Dropout(drop_probs[1])
+    self.tanh = jax.nn.tanh
 
   def __call__(self, x: Array, *, key: KeyArray) -> Array:
     """Apply the MLP block to the input."""
-    keys = jrandom.split(key, 2)
     x = self.fc1(x)
     x = self.act(x)
-    x = self.drop1(x, key=keys[0])
     x = self.fc2(x)
-    x = self.drop2(x, key=keys[1])
+    x = self.tanh(x)
     return x
 
 class SimpleNet(eqx.Module):
@@ -188,11 +206,11 @@ class SimpleNet(eqx.Module):
     self,
     in_features: int,
     hidden_features: int | None = None,
-    out_features: int | None = None,
     act: Callable = lambda x: x,
     *,
     key: KeyArray = None,
     init_scale: float = 1.0,
+    **linear_kwargs
   ):
     """Initialize an MLP.
 
@@ -207,7 +225,7 @@ class SimpleNet(eqx.Module):
        init_scale: The scale of the variance of the initial weights.
     """
     super().__init__()
-    out_features = out_features or in_features
+    # out_features = out_features or in_features
     hidden_features = hidden_features or in_features
 
     self.fc1 = Linear(
@@ -215,7 +233,8 @@ class SimpleNet(eqx.Module):
       out_features=hidden_features,
       key=key,
       init_scale=init_scale,
-    )
+      **linear_kwargs # TODO: try use_bias = False
+    ) 
     self.act = act
 
     # TODO(leonl): Add an static layer with input dimension `hidden_features`.
