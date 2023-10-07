@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing_extensions import Protocol
-from jaxtyping import Array
-from jax.random import KeyArray
+from jax import Array
 from nets.datasets.base import ExemplarType
 
 from enum import Enum
@@ -51,7 +50,7 @@ def zipfian_distribution(num_classes: int, zipf_exponent: float) -> Array:
 
 
 def generate_exemplar_idx_sequence(
-  key: KeyArray,
+  key: Array,
   label_seq: Array,
   dataset_labels: Array,
 ) -> Array:
@@ -94,7 +93,7 @@ def generate_exemplar_idx_sequence(
 class ClassSampler(Protocol):
   """Protocol for a function that generates a sequence of class indices."""
 
-  def __call__(self, key: KeyArray, num_classes: int) -> Array:
+  def __call__(self, key: Array, num_classes: int) -> Array:
     """Generate a sequence of class indices."""
     ...
 
@@ -102,13 +101,13 @@ class ClassSampler(Protocol):
 class ExemplarSampler(Protocol):
   """Protocol for a function that generates a sequence of exemplar indices."""
 
-  def __call__(self, key: KeyArray, label_seq: Array, dataset_labels: Array) -> Array:
+  def __call__(self, key: Array, label_seq: Array, dataset_labels: Array) -> Array:
     """Generate a sequence of exemplar indices."""
     ...
 
 
 def generate_sequence(
-  key: KeyArray,
+  key: Array,
   dataset_labels: Array,
   classes_to_sample: Array,
   generate_class_idx_sequence_fn: ClassSampler,
@@ -175,7 +174,7 @@ class EpochSampler(SingletonSampler):
 
   def __init__(
     self,
-    key: KeyArray,
+    key: Array,
     dataset: Dataset,
     num_epochs: int | None = None,
   ):
@@ -236,7 +235,7 @@ class ClassificationSequenceSampler(SequenceSampler):
 
   def __init__(
     self,
-    key: KeyArray,
+    key: Array,
     dataset: Dataset,
     class_split: DatasetSplit,
     exemplar_split: DatasetSplit,

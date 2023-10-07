@@ -1,8 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-from jaxtyping import Array
-from jax.random import KeyArray
+from jax import Array
 from nets.datasets.base import ExemplarType
 
 from nets.samplers.base import SingletonSampler, slice_to_array
@@ -13,7 +12,7 @@ class OnlineSampler(SingletonSampler):
 
   def __init__(
     self,
-    key: KeyArray,
+    key: Array,
     dataset: Dataset,
     num_epochs: int | None = None,
   ):

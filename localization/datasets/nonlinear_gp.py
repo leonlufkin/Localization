@@ -1,5 +1,5 @@
 """A `ParityDataset` that generates parity-labelled examples in `D` dimensions."""
-from jax.random import KeyArray
+from jax import Array
 
 import jax
 import jax.numpy as jnp
@@ -40,7 +40,7 @@ class NonlinearGPDataset(Dataset):
 
   def __init__(
     self,
-    key: KeyArray,
+    key: Array,
     xi1: float = 0.1,
     xi2: float = 1.1,
     gain: float = 1.,

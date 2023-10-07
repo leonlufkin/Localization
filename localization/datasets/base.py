@@ -5,8 +5,7 @@ from nptyping import NDArray
 from nptyping import Bool
 from nptyping import Floating
 from nptyping import Int
-from jax.random import KeyArray
-from jaxtyping import Array
+from jax import Array
 
 from enum import Enum
 from enum import unique
@@ -52,7 +51,7 @@ class Dataset:
 
   def __init__(
     self,
-    key: KeyArray,
+    key: Array,
     # split: DatasetSplit,
     # num_train_classes: int,
     # prop_train_labels: float,

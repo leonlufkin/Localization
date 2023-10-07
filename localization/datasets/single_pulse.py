@@ -1,5 +1,5 @@
 """A `ParityDataset` that generates parity-labelled examples in `D` dimensions."""
-from jax.random import KeyArray
+from jax import Array
 
 import jax
 import jax.numpy as jnp
@@ -43,7 +43,7 @@ class SinglePulseDataset(Dataset):
 
   def __init__(
     self,
-    key: KeyArray,
+    key: Array,
     xi1: tuple[float, float] = (0.1, 0.2),
     xi2: tuple[float, float] = (0.0, 0.1),
     class_proportion: float = 0.5,

@@ -9,13 +9,12 @@ import jax.random as jrandom
 import equinox as eqx
 import equinox.nn as enn
 
-from jaxtyping import Array
-from jax.random import KeyArray
+from jax import Array
 from collections.abc import Callable
 
 
 def trunc_normal_init(
-  weight: Array, key: KeyArray, stddev: float | None = None
+  weight: Array, key: Array, stddev: float | None = None
 ) -> Array:
   """Truncated normal distribution initialization."""
   _, in_ = weight.shape
@@ -31,7 +30,7 @@ def trunc_normal_init(
 # Adapted from https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/initializers.py.
 def lecun_normal_init(
   weight: Array,
-  key: KeyArray,
+  key: Array,
   scale: float = 1.0,
 ) -> Array:
   """LeCun (variance-scaling) normal distribution initialization."""
@@ -48,7 +47,7 @@ def lecun_normal_init(
 
 def xavier_normal_init(
   weight: Array,
-  key: KeyArray,
+  key: Array,
   scale: float = 1.0,
 ):
   xavier = jax.nn.initializers.glorot_normal()
@@ -57,7 +56,7 @@ def xavier_normal_init(
 
 def torch_init(
   weight: Array,
-  key: KeyArray,
+  key: Array,
   scale: float = 1.0,
 ):
   K, L = weight.shape
@@ -69,7 +68,7 @@ def torch_init(
 
 def pretrained_init(
   weight: Array,
-  key: KeyArray,
+  key: Array,
   scale: float = 1.0,
 ):
   K, L = weight.shape
@@ -79,7 +78,7 @@ def pretrained_init(
 
 def pruned_init(
   weight: Array,
-  key: KeyArray,
+  key: Array,
   scale: float = 1.0,
 ):
   K, L = weight.shape
@@ -107,7 +106,7 @@ class Linear(enn.Linear):
     use_bias: bool = True,
     trainable: bool = True,
     *,
-    key: KeyArray,
+    key: Array,
     init_scale: float = 1.0,
     init_fn: Callable = xavier_normal_init,
   ):
@@ -147,7 +146,7 @@ class MLP(eqx.Module):
     out_features: int | None = 1,
     act: Callable = lambda x: x,
     *,
-    key: KeyArray = None,
+    key: Array = None,
     init_scale: float = 1.0,
     **linear_kwargs,
   ):
@@ -185,7 +184,7 @@ class MLP(eqx.Module):
     )
     self.tanh = jax.nn.tanh
 
-  def __call__(self, x: Array, *, key: KeyArray) -> Array:
+  def __call__(self, x: Array, *, key: Array) -> Array:
     """Apply the MLP block to the input."""
     x = self.fc1(x)
     x = self.act(x)
@@ -208,7 +207,7 @@ class SimpleNet(eqx.Module):
     hidden_features: int | None = None,
     act: Callable = lambda x: x,
     *,
-    key: KeyArray = None,
+    key: Array = None,
     init_scale: float = 1.0,
     **linear_kwargs
   ):
@@ -241,7 +240,7 @@ class SimpleNet(eqx.Module):
     del hidden_features
 
 
-  def __call__(self, x: Array, *, key: KeyArray) -> Array:
+  def __call__(self, x: Array, *, key: Array) -> Array:
     """Apply the MLP block to the input."""
     x = self.fc1(x)
     x = self.act(x)

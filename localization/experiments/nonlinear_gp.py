@@ -8,8 +8,7 @@ from collections.abc import Callable
 from collections.abc import Mapping
 from collections.abc import Sequence
 from collections.abc import Generator
-from jaxtyping import Array
-from jax.random import KeyArray
+from jax import Array
 
 import os
 from socket import gethostname
@@ -60,7 +59,7 @@ def batcher(sampler: Sequence, batch_size: int) -> Generator[Sequence, None, Non
 
 
 @eqx.filter_value_and_grad
-def compute_loss(model: eqx.Module, x: Array, y: Array, key: KeyArray) -> Array:
+def compute_loss(model: eqx.Module, x: Array, y: Array, key: Array) -> Array:
   """Compute cross-entropy loss on a single example."""
   keys = jax.random.split(key, x.shape[0])
   pred_y = jax.vmap(model)(x, key=keys)
@@ -77,7 +76,7 @@ def train_step(
   opt_state: Array,
   x: Array,
   y: Array,
-  key: KeyArray,
+  key: Array,
 ) -> tuple[Array, eqx.Module, Array]:
   """Train the model on a single example."""
   loss, grads = compute_loss(model, x, y, key)
@@ -94,7 +93,7 @@ def train_step(
 def eval_step(
   x: Array,
   y: Array,
-  key: KeyArray,
+  key: Array,
   model: eqx.Module,
 ) -> Mapping[str, Array]:
   """Evaluate the model on a single example-label pair."""
@@ -147,7 +146,7 @@ def make_key(xi1, xi2, gain, num_dimensions, num_hiddens, batch_size, num_epochs
 def evaluate(
   iteration: int,
   dataset_split: str,
-  key: KeyArray,
+  key: Array,
   model: eqx.Module,
   sampler: Sequence,
   batch_size: int,
