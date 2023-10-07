@@ -1,0 +1,23 @@
+name: localization
+
+channels:
+  - default
+  - conda-forge
+
+dependencies:
+  - python>=3.11
+  - ipython
+  - ipykernel
+  - pre-commit
+
+  - numpy
+  - pandas>=2.0
+  - pytables
+  - submitit
+
+  - pytorch::pytorch
+  - conda-forge::jax
+
+  - pip
+  - pip:
+      - -e .
