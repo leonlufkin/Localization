@@ -15,7 +15,7 @@ dependencies:
   - pytables
   - submitit
 
-  - conda-forge::cudatoolkit>=12.0
+  - nvidia::cudatoolkit
   - nvidia::cuda>=12.0
 
   - pytorch::pytorch-cuda>=12.0
