@@ -7,7 +7,7 @@ from jax import random
 from functools import partial
 
 # export PYTHONPATH="${PYTHONPATH}:./" # <- NEED TO RUN THIS ON COMMAND LINE SO IT CAN FIND THE DATASET MODULE
-from datasets.base import Dataset
+from localization.datasets.base import Dataset
 from nets.datasets.base import ExemplarType
 
 def slice_to_array(s: slice, array_length: int):

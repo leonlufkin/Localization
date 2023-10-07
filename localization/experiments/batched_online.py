@@ -29,15 +29,10 @@ import optax
 
 # from nets import datasets
 # export PYTHONPATH="${PYTHONPATH}:./"
-from datasets import Dataset
-from datasets import NonlinearGPDataset, SinglePulseDataset
-from nets import samplers
-# from nets import models
-import models
-# from models import SimpleNet
-# from nets import models
-
-# from tqdm import tqdm
+from localization import datasets
+# from nets import samplers
+from localization import samplers
+from localization import models
 
 
 def accuracy(pred_y: Array, y: Array) -> Array:
@@ -58,7 +53,6 @@ def batcher(sampler: Sequence, batch_size: int) -> Generator[Sequence, None, Non
   # print("batcher: n=", n)
   for i in range(0, n, batch_size):
     yield sampler[i : min(i + batch_size, n)]
-
 
 @eqx.filter_value_and_grad
 def compute_loss(model: eqx.Module, x: Array, y: Array, key: KeyArray) -> Array:
@@ -140,18 +134,19 @@ def log_to_wandb(metrics: Mapping[str, Array]) -> None:
   wandb.log(metrics)
 
 def xi_to_str(xi):
-  if isinstance(xi, int):
+  if isinstance(xi, tuple):
+    start, end = "[", "]"
+  else:
     xi = (xi,)
     start, end = "", ""
-  else:
-    start, end = "[", "]"
   out = ",".join([ f"{x:05.2f}" for x in xi ])
   return f"{start}{out}{end}"
 
-def make_key(dataset_cls, xi1, xi2, class_proportion, batch_size, num_epochs, learning_rate, model_cls, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, *extra_args, **extra_kwargs):
+def make_key(dataset_cls, xi1, xi2, class_proportion, batch_size, num_epochs, learning_rate, model_cls, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, gain=None, **extra_kwargs):
   dataset_name = dataset_cls.__name__
   model_name = model_cls.__name__
-  return f'{dataset_name}_xi1={xi_to_str(xi1)}_xi2={xi_to_str(xi2)}_p={class_proportion:.2f}'\
+  return f'{dataset_name}_xi1={xi_to_str(xi1)}_xi2={xi_to_str(xi2)}'\
+    f'{f"_gain={gain:.3f}" if "Nonlinear" in dataset_name else ""}_p={class_proportion:.2f}'\
     f'_batch_size={batch_size}_num_epochs={num_epochs}'\
     f'_loss=mse_lr={learning_rate:.3f}'\
     f'_{model_name}_L={num_dimensions:03d}_K={num_hiddens:03d}_activation={activation.__name__ if isinstance(activation, Callable) else activation}'\
@@ -220,7 +215,7 @@ def simulate(
   # num_ins: int,
   num_hiddens: int,
   init_scale: float,
-  activation: Callable,
+  activation: str | Callable,
   # Training and evaluation params.
   learning_rate: float | Callable,  # TODO(eringrant): Define interface.
   batch_size: int,
@@ -232,12 +227,15 @@ def simulate(
   class_proportion: float,
   # Default params.
   seed: int = 0,
-  dataset_cls: type[Dataset] = SinglePulseDataset,
+  dataset_cls: type[datasets.Dataset] = datasets.SinglePulseDataset,
+  gain: float | None = None,
   model_cls: type[eqx.Module] = models.MLP,
   init_fn: Callable = models.xavier_normal_init,
   optimizer_fn: Callable = optax.sgd,
-  sampler_cls: type[samplers.EpochSampler] = samplers.EpochSampler,
+  sampler_cls: type[samplers.Sampler] = samplers.OnlineSampler,
   wandb_: bool = False,
+  save_: bool = True,
+  **kwargs, # extra kwargs
 ) -> tuple[pd.DataFrame, ...]:
   """Simulate in-context learning of classification tasks."""
   print(f"Using JAX backend: {jax.default_backend()}\n")
@@ -246,10 +244,62 @@ def simulate(
   pprint.pprint(locals())
   print()
 
+  config = dict(
+    seed=seed,
+    num_dimensions=num_dimensions,
+    num_hiddens=num_hiddens,
+    init_scale=init_scale,
+    activation=activation,
+    model_cls=model_cls,
+    optimizer_fn=optimizer_fn,
+    learning_rate=learning_rate,
+    batch_size=batch_size,
+    num_epochs=num_epochs,
+    dataset_cls=dataset_cls,
+    xi1=xi1,
+    xi2=xi2,
+    gain=gain,
+    class_proportion=class_proportion,
+    sampler_cls=sampler_cls,
+    init_fn=init_fn
+  )
+  
+  path_key = make_key(dataset_cls, xi1, xi2, gain=gain, class_proportion=class_proportion,
+                      batch_size=batch_size, num_epochs=num_epochs, learning_rate=learning_rate, 
+                      model_cls=model_cls, num_dimensions=num_dimensions, num_hiddens=num_hiddens, 
+                      activation=activation, init_scale=init_scale, init_fn=init_fn)
+
+  #########
+  # wandb setup.
+  if wandb_:
+    try:
+      wandb.init(
+        project="gimme-intuition",
+        group="debug",
+        name=make_key(**config),
+        notes=
+        """
+        Exploring variations in emergence of convolutional structure in fully-connected networks using the nonlinear Gaussian process and single pulse datasets.
+        """,
+        config=config
+      )
+    except Exception as e:
+      print("wandb.init() failed with exception: ", e)
+      print("Continuing by running locally.")
+      wandb_ = False
+
   # Single source of randomness.
   data_key, model_key, train_key, eval_key = jax.random.split(
     jax.random.PRNGKey(seed), 4
   )
+
+  # Fixing annoying activation function bug
+  if activation == 'tanh':
+    activation = jax.nn.tanh
+  elif activation == 'shifted_relu':
+    activation = lambda x: jax.nn.relu(x) - 1.
+  elif activation == 'identity':
+    activation = lambda x: x
 
   #########
   # Data setup.
@@ -259,7 +309,7 @@ def simulate(
   
   train_dataset = dataset_cls(
     key=train_dataset_key,
-    xi1=xi1, xi2=xi2,
+    xi1=xi1, xi2=xi2, gain=gain,
     class_proportion=class_proportion,
     num_dimensions=num_dimensions,
     num_exemplars=num_epochs*batch_size,
@@ -267,10 +317,10 @@ def simulate(
   
   eval_dataset = dataset_cls(
     key=eval_dataset_key,
-    xi1=xi1, xi2=xi2,
+    xi1=xi1, xi2=xi2, gain=gain,
     class_proportion=class_proportion,
     num_dimensions=num_dimensions,
-    num_exemplars=20*batch_size,
+    num_exemplars=1000,#max(20*batch_size,1000),
   )
 
   print(f"Length of train dataset: {len(train_dataset)}")
@@ -288,13 +338,13 @@ def simulate(
   train_sampler = sampler_cls(
     key=train_sampler_key,
     dataset=train_dataset,
-    num_epochs=1,
+    # num_epochs=1,
   )
   
   eval_sampler = sampler_cls(
     key=eval_sampler_key,
     dataset=eval_dataset,
-    num_epochs=1,
+    # num_epochs=1,
   )
   
   print(f"Length of train sampler: {len(train_sampler)}")
@@ -330,7 +380,7 @@ def simulate(
       sampler=eval_sampler,
       model=eqx.tree_inference(model, True),
       key=eval_key,
-      batch_size=batch_size,
+      batch_size=len(eval_sampler),
     )
   log_to_wandb(metrics_) if wandb_ else metrics.append(metrics_)
 
@@ -342,26 +392,20 @@ def simulate(
     raise ValueError("Too many `evaluations_per_epoch`.")
 
   print("\nStarting training...")
-  print(f"Length of train sampler: {len(train_sampler)}")
   
   start_time = time.time()
-
-  path_key = make_key(dataset_cls, xi1, xi2, class_proportion=class_proportion,
-                      batch_size=batch_size, num_epochs=num_epochs, learning_rate=learning_rate, 
-                      model_cls=model_cls, num_dimensions=num_dimensions, num_hiddens=num_hiddens, 
-                      activation=activation, init_scale=init_scale, init_fn=init_fn)
       
-  def save_model_weights(train_step_num):
-    # save model weights
-    if gethostname() == 'Leons-MBP': 
-      jnp.save(f"results/weights/{path_key}/fc1_{train_step_num}.npy", model.fc1.weight)
-    else:
-      os.makedirs(f"/tmp/weights/", exist_ok=True)
-      jnp.save(f"/tmp/weights/fc1_{train_step_num}.npy", model.fc1.weight)
-    print(f"Saved model weights at iteration {train_step_num}.")
+#   def save_model_weights(train_step_num):
+#     # save model weights
+#     if gethostname() == 'Leons-MBP': 
+#       jnp.save(f"results/weights/{path_key}/fc1_{train_step_num}.npy", model.fc1.weight)
+#     else:
+#       os.makedirs(f"/tmp/weights/", exist_ok=True)
+#       jnp.save(f"/tmp/weights/fc1_{train_step_num}.npy", model.fc1.weight)
+#     print(f"Saved model weights at iteration {train_step_num}.")
   
   weights = [] # just for local runs
-  weights.append(model.fc1.weight) if gethostname() == 'Leons-MBP' else save_model_weights(train_step_num=0)
+  weights.append(model.fc1.weight) #if gethostname() == 'Leons-MBP' else save_model_weights(train_step_num=0)
   
   for epoch, (x, y) in enumerate(batcher(train_sampler, batch_size)):
     (train_key,) = jax.random.split(train_key, 1)
@@ -380,12 +424,12 @@ def simulate(
         sampler=eval_sampler,
         model=eqx.tree_inference(model, True),
         key=eval_key,
-        batch_size=batch_size,
+        batch_size=len(eval_sampler),
       )
       
       log_to_wandb(metrics_) if wandb_ else metrics.append(metrics_)
       
-      weights.append(model.fc1.weight) if gethostname() == 'Leons-MBP' else save_model_weights(train_step_num=train_step_num)
+      weights.append(model.fc1.weight) #if gethostname() == 'Leons-MBP' else save_model_weights(train_step_num=train_step_num)
       
       start_time = time.time()
 
@@ -396,64 +440,56 @@ def simulate(
     print("wandb.finish() failed")
 
   # combine all weights in /tmp/weights/
-  if gethostname() != 'Leons-MBP':
-    weights = [ np.load(f"'/tmp/weights/fc1_{train_step_num}.npy") for train_step_num in range(0, num_epochs+1, evaluation_interval) ]
+#   if gethostname() != 'Leons-MBP':
+#     weights = [ np.load(f"'/tmp/weights/fc1_{train_step_num}.npy") for train_step_num in range(0, num_epochs+1, evaluation_interval) ]
   weights = np.stack(weights, axis=0)
-  if gethostname() == 'Leons-MBP':
-    os.makedirs(f"results/weights/{path_key}", exist_ok=True)
-    np.save(f"results/weights/{path_key}/fc1.npy", weights)
-  else:
-    np.save(f"/ceph/scratch/leonl/results/jax_results/fc1_{path_key}.npy", weights)
-
-  if not wandb_:
-    df = pd.DataFrame(metrics)
-    df['epoch'] = np.minimum(df.index * evaluation_interval, num_epochs)
+  if save_:
     if gethostname() == 'Leons-MBP':
-      df.to_csv(f"results/weights/{path_key}/metrics.csv")
+        os.makedirs(f"results/weights/{path_key}", exist_ok=True)
+        np.save(f"results/weights/{path_key}/fc1.npy", weights)
     else:
-      df.to_csv(f"/ceph/scratch/leonl/results/jax_results/{path_key}/metrics.csv")
-    return df
+        np.save(f"/ceph/scratch/leonl/results/jax_results/fc1_{path_key}.npy", weights)
+
+#   if not wandb_:
+  df = pd.DataFrame(metrics)
+  df['epoch'] = np.minimum(df.index * evaluation_interval, num_epochs)
+  if save_:
+    if gethostname() == 'Leons-MBP':
+        df.to_csv(f"results/weights/{path_key}/metrics.csv")
+    else:
+        df.to_csv(f"/ceph/scratch/leonl/results/jax_results/metrics_{path_key}.csv")
+  
+  return weights, df
 
 if __name__ == '__main__':
 
   # define config
   config = dict(
     seed=0,
-    num_dimensions=70,
+    num_dimensions=40,
     num_hiddens=100,
+    gain=1.1,
     init_scale=1.0,
-    activation=jax.nn.hard_tanh,
+    activation='tanh',
     model_cls=models.SimpleNet,
     optimizer_fn=optax.sgd,
     learning_rate=1.0,
-    batch_size=100,
-    num_epochs=1000,
-    dataset_cls=SinglePulseDataset,
-    xi1=(20, 25), # (20, 25),
-    xi2=(5, 10), # (5, 10),
+    batch_size=5000,
+    num_epochs=200,
+    # dataset_cls=datasets.SinglePulseDataset,
+    # xi1=(0.2, 0.25), # (20, 25),
+    # xi2=(0.05, 0.1), #(5, 10), # (5, 10),
+    dataset_cls=datasets.NonlinearGPDataset,
+    xi1=4.47,
+    xi2=0.1,
     class_proportion=0.5,
     sampler_cls=samplers.EpochSampler,
-    init_fn=models.lecun_normal_init
+    init_fn=models.torch_init,
+    save_=True,
   )
   
   # log config to wandb
-  wandb_ = True # False
-  if wandb_:
-    try:
-      wandb.init(
-        project="single-pulse",
-        group="debug",
-        name=make_key(**config),
-        notes=
-        """
-        Exploring variations in emergence of convolutional structure in fully-connected networks using the single-pulse dataset.
-        """,
-        config=config
-      )
-    except Exception as e:
-      print("wandb.init() failed with exception: ", e)
-      print("Continuing by running locally.")
-      wandb_ = False
+  wandb_ = False
 
   # run it
   simulate(wandb_=wandb_, **config)

@@ -8,8 +8,22 @@ import datasets
 import models
 import samplers
 import matplotlib.pyplot as plt
-from conv_emergence import compute_entropy as entropy
-from experiments import make_key, simulate
+from localization.experiments import make_key, simulate
+
+
+def entropy(weights, low=-10, upp=10, delta=0.1, base=2):
+    entropies = np.zeros(weights.shape[0])
+    for neuron, weight in enumerate(weights):
+        xs = np.arange(low, upp, delta)
+        count = np.zeros(len(xs)+1)
+        count[0] = np.sum(weight < xs[0])
+        for i in range(len(xs)-1):
+            count[i] = np.sum(weight < xs[i+1]) - np.sum(weight < xs[i])
+        count[-1] = np.sum(weight >= xs[-1])
+        prob = count / np.sum(count)
+        entropies[neuron] = entropy(prob, base=base)
+    return entropies
+            
 
 def position_mean_var(weight):
     # use weights to construct probability distribution

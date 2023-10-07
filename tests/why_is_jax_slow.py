@@ -1,10 +1,10 @@
 import jax
 import optax
-import datasets
-import models
-import samplers
-from experiments import simulate as simulate_jax # this function is defined in batched_online.py
-from v_torch.conv_emergence import main as simulate_torch
+from localization import datasets
+from localization import models
+from localization import samplers
+from localization.experiments import simulate as simulate_jax # this function is defined in batched_online.py
+from localization.v_torch.conv_emergence import main as simulate_torch
 import time
 
 if __name__ == '__main__':
