@@ -2,10 +2,12 @@
 leonl/figs
 leonl/results
 leonl/logs
+localization/v_torch/weights/
 results/*
 wandb/*
 
 .DS_Store
+**/.DS_Store
 
 
 # Byte-compiled / optimized / DLL files
