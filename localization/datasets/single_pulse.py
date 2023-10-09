@@ -19,23 +19,12 @@ def slice_to_array(s: slice, array_length: int):
   return jnp.array(range(start, stop, step))
 
 def generate_pulse(key, xi_lower, xi_upper, L):
-    start_key, stop_key = jax.random.split(key, 2)
-    start = jax.random.randint(start_key, shape=(), minval=0, maxval=L)
-    stop = start + jax.random.randint(stop_key, shape=(), minval=xi_lower, maxval=xi_upper) + 1
-    l = jnp.arange(L)
-    X = jnp.where(start <= l, 1., 0.) * jnp.where(l < stop, 1., 0.) + jnp.where(l < stop - L, 1., 0.)
-    return 2 * X - 1
-        
-def generate_pulse_branching(key, xi1_lower, xi1_upper, xi2_lower, xi2_upper, class_proportion, L):
-  label_key, exemplar_key, sign_key = jax.random.split(key, 3)
-  label = jax.random.bernoulli(label_key, p=class_proportion)
-  xi_lower = jnp.where(label, xi1_lower, xi2_lower)
-  xi_upper = jnp.where(label, xi1_upper, xi2_upper)
-  sign = 2 * jax.random.bernoulli(sign_key, p=0.5) - 1
-  exemplar = sign * generate_pulse(exemplar_key, xi_lower, xi_upper, L)
-  # exemplar = generate_pulse(exemplar_key, xi_lower, xi_upper, L)
-  label = 2 * jnp.float32(label) - 1
-  return exemplar, label
+  start_key, stop_key = jax.random.split(key, 2)
+  start = jax.random.randint(start_key, shape=(), minval=0, maxval=L)
+  stop = start + jax.random.randint(stop_key, shape=(), minval=xi_lower, maxval=xi_upper) + 1
+  l = jnp.arange(L)
+  X = jnp.where(start <= l, 1., 0.) * jnp.where(l < stop, 1., 0.) + jnp.where(l < stop - L, 1., 0.)
+  return X
 
 
 class SinglePulseDataset(Dataset):
@@ -49,6 +38,7 @@ class SinglePulseDataset(Dataset):
     class_proportion: float = 0.5,
     num_dimensions: int = 100,
     num_exemplars: int = 1000,
+    support: tuple[float, float] = (0.0, 1.0),
     **kwargs
   ):
     """
@@ -77,15 +67,29 @@ class SinglePulseDataset(Dataset):
     xi1_lower, xi1_upper = int(xi1[0] * num_dimensions), int(xi1[1] * num_dimensions)
     xi2_lower, xi2_upper = int(xi2[0] * num_dimensions), int(xi2[1] * num_dimensions)
     
-    self.generate_xi = jax.jit(
+    self.generate_xi1 = jax.jit(
       jax.vmap(
-        partial(generate_pulse_branching, 
-                xi1_lower = xi1_lower,
-                xi1_upper = xi1_upper,
-                xi2_lower = xi2_lower,
-                xi2_upper = xi2_upper,
-                class_proportion=class_proportion,
+        partial(generate_pulse, 
+                xi_lower=xi1_lower,
+                xi_upper=xi1_upper,
                 L=num_dimensions)
+        )
+    )
+    
+    self.generate_xi2 = jax.jit(
+      jax.vmap(
+        partial(generate_pulse, 
+                xi_lower=xi2_lower,
+                xi_upper=xi2_upper,
+                L=num_dimensions)
+        )
+    )
+    
+    # Adjust support
+    self.adjust_support = jax.jit(
+      jax.vmap(
+        partial(lambda x, support: x * (support[1] - support[0]) + support[0],
+                support=support)
         )
     )
 
@@ -104,14 +108,27 @@ class SinglePulseDataset(Dataset):
       index = slice_to_array(index, len(self))
     else:
       index = index
+    n = index.shape[0]
 
     keys = jax.vmap(jax.random.fold_in, in_axes=(None, 0))(self.key, index)
     if isinstance(index, int):
         keys = jnp.expand_dims(keys, axis=0)
 
-    exemplars, labels = self.generate_xi(
-        key=keys,
-    )
+    # generate xi1 and xi2
+    xi1 = self.generate_xi1(key=keys)
+    xi2 = self.generate_xi2(key=keys)
+    # concatenate xi1 and xi2
+    exemplars = jnp.concatenate((xi1, xi2), axis=0)
+    labels = jnp.concatenate((jnp.ones(n), jnp.zeros(n)), axis=0)
+    # subsample
+    perm = jax.random.permutation(keys[0], exemplars.shape[0])
+    exemplars = exemplars[perm[:n]]
+    labels = labels[perm[:n]] 
+    # randomly flip sign of exemplars
+    sign = jax.random.bernoulli(keys[0], p=0.5)
+    exemplars = jnp.where(sign, exemplars, 1-exemplars)
+    # adjust support of exemplars
+    exemplars = self.adjust_support(exemplars)
 
     if isinstance(index, int):
       exemplars = exemplars[0]

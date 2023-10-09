@@ -37,7 +37,7 @@ from localization import models
 def accuracy(pred_y: Array, y: Array) -> Array:
   """Compute elementwise accuracy."""
   # print("accuracy: pred_y.shape=", pred_y.shape, "y.shape=", y.shape)
-  predicted_class = jnp.where(pred_y > 0, 1., -1) # jnp.argmax(pred_y, axis=-1)
+  predicted_class = jnp.where(pred_y > 0.5, 1., 0.) # jnp.argmax(pred_y, axis=-1)
   return predicted_class == y
 
 
@@ -98,17 +98,25 @@ def eval_step(
   # Standard metrics.
   elementwise_acc = accuracy(pred_y, y)
   elementwise_loss = mse(pred_y, y)
+  
+  # Track model internals.
+  bias = model.fc1.bias
 
-  return {
+  d = {
     "loss": elementwise_loss.mean(),
     "accuracy": elementwise_acc.mean(),
   }
+  if bias is not None:
+    d.update({"bias": bias})
+
+  return d
 
 
 def summarize_metrics(metrics):
   """Summarize metrics output from `eval_step` for printing."""
   loss = metrics['loss'].mean(0)
   acc = metrics['accuracy'].mean(0)
+  # bias = metrics['bias'].mean(0)
   with np.printoptions(precision=2):
     return (
       "\tloss:"
@@ -122,33 +130,38 @@ def metrics_to_dict(metrics: Mapping[str, Array]) -> dict:
   iteration = metrics["training iteration"]
   loss = metrics["loss"].mean(0)
   acc = metrics["accuracy"].mean(0)
-  d = {"iteration": iteration, "loss": loss, "accuracy": acc,}
+  d = {"iteration": iteration, "loss": loss, "accuracy": acc}
+  if "bias" in metrics.keys():
+    d["bias"] = metrics["bias"].mean(0)
   return d
 
 def metrics_to_df(metrics: Mapping[str, Array]) -> pd.DataFrame:
   """Pandas-ify metrics from `eval_step` for later analysis."""
-  return pd.DataFrame(metrics_to_dict(metrics), index=[0])
+  metrics_ = metrics_to_dict(metrics)
+  if "bias" in metrics_.keys():
+    metrics_.pop("bias")
+  return pd.DataFrame(metrics_to_dict(metrics_), index=[0])
 
 def log_to_wandb(metrics: Mapping[str, Array]) -> None:
   wandb.log(metrics)
 
-def xi_to_str(xi):
-  if isinstance(xi, tuple):
+def interval_to_str(interval):
+  if isinstance(interval, tuple):
     start, end = "[", "]"
   else:
-    xi = (xi,)
+    interval = (interval,)
     start, end = "", ""
-  out = ",".join([ f"{x:05.2f}" for x in xi ])
+  out = ",".join([ f"{x:05.2f}" for x in interval ])
   return f"{start}{out}{end}"
 
-def make_key(dataset_cls, xi1, xi2, class_proportion, batch_size, num_epochs, learning_rate, model_cls, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, gain=None, **extra_kwargs):
+def make_key(dataset_cls, support, xi1, xi2, class_proportion, batch_size, num_epochs, learning_rate, model_cls, use_bias, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, gain=None, **extra_kwargs):
   dataset_name = dataset_cls.__name__
   model_name = model_cls.__name__
-  return f'{dataset_name}_xi1={xi_to_str(xi1)}_xi2={xi_to_str(xi2)}'\
+  return f'{dataset_name}{interval_to_str(support)}_xi1={interval_to_str(xi1)}_xi2={interval_to_str(xi2)}'\
     f'{f"_gain={gain:.3f}" if "Nonlinear" in dataset_name else ""}_p={class_proportion:.2f}'\
     f'_batch_size={batch_size}_num_epochs={num_epochs}'\
     f'_loss=mse_lr={learning_rate:.3f}'\
-    f'_{model_name}_L={num_dimensions:03d}_K={num_hiddens:03d}_activation={activation.__name__ if isinstance(activation, Callable) else activation}'\
+    f'_{model_name}{"" if use_bias else "nobias"}_L={num_dimensions:03d}_K={num_hiddens:03d}_activation={activation.__name__ if isinstance(activation, Callable) else activation}'\
     f'_init_scale={init_scale:.3f}_{init_fn.__name__ if isinstance(init_fn, Callable) else init_fn}'
   
 def evaluate(
@@ -193,6 +206,7 @@ def evaluate(
       ] = batch_metrics[metric_name]
 
   metrics.update(incremental_metrics)
+  # print(incremental_metrics.keys())
 
   ### Model / parameter metrics.
   # metrics["last layer weight norm"] = float(jnp.linalg.norm(model.unembed.weight))
@@ -227,8 +241,10 @@ def simulate(
   # Default params.
   seed: int = 0,
   dataset_cls: type[datasets.Dataset] = datasets.SinglePulseDataset,
+  support: tuple[float, float] = (0.0, 1.0),
   gain: float | None = None,
   model_cls: type[eqx.Module] = models.MLP,
+  use_bias = True,
   init_fn: Callable = models.xavier_normal_init,
   optimizer_fn: Callable = optax.sgd,
   sampler_cls: type[samplers.Sampler] = samplers.OnlineSampler,
@@ -250,11 +266,13 @@ def simulate(
     init_scale=init_scale,
     activation=activation,
     model_cls=model_cls,
+    use_bias=use_bias,
     optimizer_fn=optimizer_fn,
     learning_rate=learning_rate,
     batch_size=batch_size,
     num_epochs=num_epochs,
     dataset_cls=dataset_cls,
+    support=support,
     xi1=xi1,
     xi2=xi2,
     gain=gain,
@@ -263,10 +281,11 @@ def simulate(
     init_fn=init_fn
   )
   
-  path_key = make_key(dataset_cls, xi1, xi2, gain=gain, class_proportion=class_proportion,
-                      batch_size=batch_size, num_epochs=num_epochs, learning_rate=learning_rate, 
-                      model_cls=model_cls, num_dimensions=num_dimensions, num_hiddens=num_hiddens, 
-                      activation=activation, init_scale=init_scale, init_fn=init_fn)
+  # path_key = make_key(dataset_cls, xi1, xi2, gain=gain, class_proportion=class_proportion,
+  #                     batch_size=batch_size, num_epochs=num_epochs, learning_rate=learning_rate, 
+  #                     model_cls=model_cls, use_bias=use_bias, num_dimensions=num_dimensions, num_hiddens=num_hiddens, 
+  #                     activation=activation, init_scale=init_scale, init_fn=init_fn)
+  path_key = make_key(**config)
 
   #########
   # wandb setup.
@@ -293,10 +312,10 @@ def simulate(
   )
 
   # Fixing annoying activation function bug
-  if activation == 'tanh':
-    activation = jax.nn.tanh
-  elif activation == 'shifted_relu':
-    activation = lambda x: jax.nn.relu(x) - 1.
+  if activation == 'sigmoid':
+    activation = jax.nn.sigmoid
+  elif activation == 'relu':
+    activation = jax.nn.relu
   elif activation == 'identity':
     activation = lambda x: x
 
@@ -337,13 +356,13 @@ def simulate(
   train_sampler = sampler_cls(
     key=train_sampler_key,
     dataset=train_dataset,
-    # num_epochs=1,
+    num_epochs=1,
   )
   
   eval_sampler = sampler_cls(
     key=eval_sampler_key,
     dataset=eval_dataset,
-    # num_epochs=1,
+    num_epochs=1,
   )
   
   print(f"Length of train sampler: {len(train_sampler)}")
@@ -358,7 +377,7 @@ def simulate(
       act=activation,
       key=model_key,
       init_scale=init_scale,
-      use_bias=False,
+      use_bias=use_bias,
       init_fn=init_fn,
   )
   print(f"Model:\n{model}\n")
@@ -442,22 +461,13 @@ def simulate(
 #   if gethostname() != 'Leons-MBP':
 #     weights = [ np.load(f"'/tmp/weights/fc1_{train_step_num}.npy") for train_step_num in range(0, num_epochs+1, evaluation_interval) ]
   weights = np.stack(weights, axis=0)
-  if save_:
-    if gethostname() == 'Leons-MBP':
-        os.makedirs(f"results/weights/{path_key}", exist_ok=True)
-        np.save(f"results/weights/{path_key}/fc1.npy", weights)
-    else:
-        np.save(f"/ceph/scratch/leonl/results/jax_results/fc1_{path_key}.npy", weights)
-
-#   if not wandb_:
   df = pd.DataFrame(metrics)
   df['epoch'] = np.minimum(df.index * evaluation_interval, num_epochs)
   if save_:
-    if gethostname() == 'Leons-MBP':
-        df.to_csv(f"results/weights/{path_key}/metrics.csv")
-    else:
-        df.to_csv(f"/ceph/scratch/leonl/results/jax_results/metrics_{path_key}.csv")
-  
+    dir_ = "/Users/leonlufkin/Documents/GitHub/Localization/localization/results/weights" if gethostname() == 'Leons-MBP' else "/ceph/scratch/leonl/results/jax_results"
+    # os.makedirs(f"results/weights/", exist_ok=True)
+    np.savez(f"{dir_}/{path_key}.npz", weights=weights, metrics=df.to_numpy()[:,:-1])
+
   return weights, df
 
 if __name__ == '__main__':
@@ -467,23 +477,25 @@ if __name__ == '__main__':
     seed=0,
     num_dimensions=40,
     num_hiddens=100,
-    gain=1.1,
+    gain=3,
     init_scale=1.0,
-    activation='tanh',
+    activation='relu',
     model_cls=models.SimpleNet,
+    use_bias=False,
     optimizer_fn=optax.sgd,
-    learning_rate=1.0,
-    batch_size=5000,
-    num_epochs=200,
+    learning_rate=10.0,
+    batch_size=1000,
+    num_epochs=5000,
     # dataset_cls=datasets.SinglePulseDataset,
     # xi1=(0.2, 0.25), # (20, 25),
     # xi2=(0.05, 0.1), #(5, 10), # (5, 10),
     dataset_cls=datasets.NonlinearGPDataset,
-    xi1=4.47,
-    xi2=0.1,
+    xi1=2,
+    xi2=1,
+    support=(0.0, 1.0),
     class_proportion=0.5,
     sampler_cls=samplers.EpochSampler,
-    init_fn=models.torch_init,
+    init_fn=models.xavier_normal_init,
     save_=True,
   )
   
