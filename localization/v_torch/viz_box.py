@@ -7,6 +7,7 @@ import pandas as pd
 # import datasets
 # import models
 # import samplers
+import sys; sys.path.append('../')
 import matplotlib.pyplot as plt
 from conv_emergence import compute_entropy as entropy
 from experiments import make_key, simulate

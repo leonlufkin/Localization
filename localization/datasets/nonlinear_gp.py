@@ -16,15 +16,15 @@ from nets.datasets.base import ExemplarType
 
 from jax.scipy.special import erf as gain_function
 
-#from line_profiler import LineProfiler
+from line_profiler import LineProfiler
 #
-#profiler = LineProfiler()
-#def profile(func):
-#    def inner(*args, **kwargs):
-#        profiler.add_function(func)
-#        profiler.enable_by_count()
-#        return func(*args, **kwargs)
-#    return inner
+profiler = LineProfiler()
+def profile(func):
+   def inner(*args, **kwargs):
+       profiler.add_function(func)
+       profiler.enable_by_count()
+       return func(*args, **kwargs)
+   return inner
 
 def slice_to_array(s: slice, array_length: int):
   """Convert a `slice` object to an array of indices."""
@@ -47,6 +47,7 @@ class NonlinearGPDataset(Dataset):
     class_proportion: float = 0.5,
     num_dimensions: int = 100,
     num_exemplars: int = 1000,
+    support: tuple[float, float] = (-1.0, 1.0),
     **kwargs
   ):
     """Initializes a `NonlinearGPDataset` instance."""
@@ -91,20 +92,29 @@ class NonlinearGPDataset(Dataset):
         )
     )
     
-    # self.generate_xi1 = jax.jit(
-    #   jax.vmap(
-    #     partial(generate_non_gaussian,
-    #             xi=xi1, L=num_dimensions, g=gain,
-    #             ),
-    #   )
-    # )
-    # self.generate_xi2 = jax.jit(
-    #   jax.vmap(
-    #     partial(generate_non_gaussian,
-    #             xi=xi2, L=num_dimensions, g=gain,
-    #             ),
-    #   )
-    # )
+    self.generate_xi1 = jax.jit(
+      jax.vmap(
+        partial(generate_non_gaussian,
+                xi=xi1, L=num_dimensions, g=gain,
+                ),
+      )
+    )
+    self.generate_xi2 = jax.jit(
+      jax.vmap(
+        partial(generate_non_gaussian,
+                xi=xi2, L=num_dimensions, g=gain,
+                ),
+      )
+    )
+    
+    # Adjust support
+    z = Z(gain)
+    self.adjust_support = jax.jit(
+      jax.vmap(
+        partial(lambda x, support: (x * z + 1) * (support[1] - support[0]) / 2 + support[0],
+                support=support)
+        )
+    )
     
 
   @property
@@ -123,15 +133,24 @@ class NonlinearGPDataset(Dataset):
       index = slice_to_array(index, len(self))
     else:
       index = index
+    n = index.shape[0]
 
     keys = jax.vmap(jax.random.fold_in, in_axes=(None, 0))(self.key, index)
     if isinstance(index, int):
-        keys = jnp.expand_dims(keys, axis=0)
-    xis = jax.random.bernoulli(keys, p=0.5)
-
-    exemplars, labels = self.generate_xi(
-        key=keys,
-    )
+      keys = jnp.expand_dims(keys, axis=0)
+        
+    # generate xi1 and xi2
+    xi1 = self.generate_xi1(key=keys)
+    xi2 = self.generate_xi2(key=keys)
+    # concatenate xi1 and xi2
+    exemplars = jnp.concatenate((xi1, xi2), axis=0)
+    labels = jnp.concatenate((jnp.ones(n), jnp.zeros(n)), axis=0)
+    # subsample
+    perm = jax.random.permutation(keys[0], exemplars.shape[0])
+    exemplars = exemplars[perm[:n]]
+    labels = labels[perm[:n]]
+    # adjust support
+    exemplars = self.adjust_support(exemplars)
 
     if isinstance(index, int):
       exemplars = exemplars[0]

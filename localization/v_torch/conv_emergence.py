@@ -123,6 +123,7 @@ class NeuralNet(Model):
             self.ff2.bias.data.zero_()
         elif second_layer == 'mean':
             self.ff2.weight.data[:] = torch.ones(second_out_size, hidden_dim) / self.hidden_dim
+            self.ff2.weight.data[0] *= -1
             self.ff2.bias.data[:] = torch.zeros(second_out_size)
             self.ff2.weight.requires_grad = False
             self.ff2.bias.requires_grad = False
@@ -350,7 +351,7 @@ def main(
     weights_ = model.ff1.weight.detach().cpu().numpy().copy()
     weights = [ weights_ ]
     iprs = []
-    every_epoch = min(max(num_epochs // 100, 1), 500) # 10 was 100
+    every_epoch = min(max(num_epochs // 10, 1), 500) # 10 was 100
     iteration = 1
     
     for epoch, (X, y) in enumerate(loader):
@@ -429,14 +430,14 @@ if __name__ == '__main__':
     
     kwargs = dict(
         task='nlgp',
-        xi1 = 8,
+        xi1 = 4,
         xi2 = 2,
-        gain = 10, #0.05,
+        gain = 3, #0.05,
         L = 100,
         dim = 1,
         K = 40,
         batch_size = 1000,
-        num_epochs = 1000,
+        num_epochs = 10000,
         lr = 0.2,
         init_scale = 1.0,
         save_ = True,
