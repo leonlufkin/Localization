@@ -1,0 +1,301 @@
+% GO TO: /Users/leonlufkin/Library/texmf/tex/latex
+%        to add custom packages to the path
+\documentclass{article}
+\usepackage{report}
+
+\title{Receptive Field Localization}
+\author{Leon Lufkin}
+\date{\today}
+
+\makeatletter
+\let\Title\@title
+\let\Author\@author
+\let\Date\@date
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%
+%% The Problem %%
+%%%%%%%%%%%%%%%%%
+\section{The Problem}
+We consider a feedforward neural network with a single hidden layer and activation function $\sigma$.
+It receives an input $x \in \R^L$ and produces a scalar output $\hat{y} \in \R$.
+The hidden layer has $K$ units.
+The weights for the first and second layer are $W_1 \in \R^{K \times L}$ and $W_2 \in \R^{1 \times K}$, respectively, and the corresponding biases are $b_1 \in \R^K$ and $b_2 \in \R$.
+\begin{align}
+  \hat{y} &= W_2 \sigma( W_1 x + b_1 ) + b_2. \label{eq:model}
+\end{align}
+
+Our data $x$ are sampled from a mixture of two translation-invariant distributions in some family $\{ p_\xi \}_{\xi}$ parameterized by a correlation length-scale $\xi$.
+That is, we sample $x \sim p_{\xi_1}$ with probability $\frac{1}{2}$ and $x \sim p_{\xi_2}$ otherwise.
+If $x$ is sampled from $p_{\xi_1}$, then $y(x) = 1$; otherwise, $y(x) = 0$. 
+We can train using either mean-squared error or cross-entropy loss, though we primarily consider the former. 
+
+Alessandro's paper primarily considers the case where $W_2 = \frac{1}{K} \mathbf{1}^\top$ (take the mean of the hidden activations) is fixed and $\sigma(h) = \text{erf}(\frac{h}{\sqrt{2}})$.
+I have also tried $\sigma = \text{sigmoid}, \text{ReLU}$.
+For the former, the results are qualitatively identical, while for the latter we get localization if $\xi_1 > \xi_2$ and short-range oscillations otherwise.
+For $\sigma = \text{ReLU}$, one can further remove the bias terms $b_1$ and $b_2$ (though not for sigmoid).
+% TODO: explain why
+
+We consider two types of datasets: the nonlinear Gaussian process (NLGP) and the single pulse (SP).
+We explain them in more detail later.
+They differ primarily in that the former has continuous support on $\R^L$, while the latter has discrete support on a subset of $\{ 0, 1 \}^L$.
+The former also has a gain parameter that controls the degree of localization, while the latter does not. 
+
+Motivated by localization with the ReLU model, we tried to see how well a gated deep linear network (GDLN) could do.
+Next, we'll provide some experimental support for why this might work, and then do some analysis. 
+We'll conclude with some questions and concerns.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Have You Tried Making It Linear? %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Have You Tried Making It Linear?}
+\subsection{Sign-flipping}
+
+\subsection{Predicting loca(liza)tion}
+
+\subsection{Evolving gates?}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Let's Consider a Single Layer with Linear Activation... %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Let's Consider a Single Layer with Linear Activation...}
+
+%% Model %%
+\subsection{Model}
+Our GDLN model is defined as follows:
+\begin{align}
+  \hat{y}(x) &= \frac{1}{K} \left( \sum_{k \in [K]} g_k(x) W_k \right) x, \label{eq:gdln_model}
+\end{align}
+where $g_k$ are (node) gates.
+
+%% Gradient Flow %%
+\subsection{Gradient Flow}
+Recalling the GDLN paper, the gradient flow for $W_1$ is given by
+\begin{align}
+  \tau \frac{d}{dt} W_1 &= \frac{1}{K} \left[ \Sigma^{yx}(p_1) - \sum_{k \in [K]} W_k \Sigma^{xx}(p_1,p_k) \right], \label{eq:grad_flow}
+\end{align}
+where
+\begin{align}
+  \Sigma^{yx}(p) &= \left\langle g_p y x^\top \right\rangle_{x,y} \\
+  \Sigma^{xx}(p,q) &= \left\langle g_p g_q x x^\top \right\rangle_{x,y}.
+\end{align}
+
+\subsection{General Case}
+Let us relabel $w_i = W_i^\top$, $b_i = \Sigma^{yx}(p_i)^\top$, and $A_{ij} = \sigma^{xx}(p_i,p_j)$.
+Note that $A_{ij}$ is symmetric and $A_{ij} = A_{ji}$.
+Then, we can write the gradient flow for all weights as
+\begin{align}
+  K \tau \frac{d}{dt} \underbrace{\begin{bmatrix} w_1 \\ \vdots \\ w_K \end{bmatrix}}_{w \in \R^{Kn}}
+  &= \underbrace{\begin{bmatrix} b_1 \\ \vdots \\ b_k \end{bmatrix}}_{b \in \R^{Kn}} - \underbrace{\begin{bmatrix} A_{11} & \cdots & A_{1K} \\ \vdots & \ddots & \vdots \\ A_{K1} & \cdots & A_{KK} \end{bmatrix}}_{A \in \R^{Kn \times Kn}} \begin{bmatrix} w_1 \\ \vdots \\ w_K \end{bmatrix}.
+\end{align}
+Note that $A$ is a symmetric real matrix, so we can diagonalize it as $A = P \Lambda P^\top$, where the columns of $P$ are the eigenvectors of $A$ and the diagonal entries of $\Lambda$ are the corresponding (nonnegative) eigenvalues.
+We can reparameterize in terms of $u = P^\top w$ and $c = P^\top b$.
+\begin{align}
+  K \tau \frac{d}{dt} u &= - \Lambda u + c
+  \implies
+  u(t) = \Lambda^{-1} e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + \Lambda^{-1} c,
+\end{align}
+where $C$ is a constant diagonal matrix that defines the initial condition.
+So,
+\begin{align}
+  w(t) 
+  &= P \Lambda^{-1} e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + P \Lambda^{-1} c \\
+  &= A^{-1} P e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + A^{-1} b.
+\end{align}
+If none of the eigenvalues are zero, then $w(\infty) = A^{-1} b$.
+
+If we write
+\begin{align}
+  \tilde{x} &= \begin{bmatrix} g_1(x) x \\ \vdots \\ g_K(x) x \end{bmatrix} \in \R^{Kn},
+\end{align}
+then $A = \langle \tilde{x} \tilde{x}^\top \rangle_{x,y}$ and $b = \langle \tilde{x} y \rangle_{x,y}$.
+Then, it is clear that this is the population solution to the OLS problem of regressing $y$ on $\tilde{x}$.
+
+In this context, one might ask, which gating structure minimizes the OLS loss?
+The OLS error is
+\begin{align}
+  &\left\langle \left( \tilde{x}'^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y})^{-1} \langle \tilde{x} y \rangle_{x,y} - y' \right)^2 \right\rangle_{x',y'} \\
+  &= \left\langle ( \tilde{x}'^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y})^{-1} \langle \tilde{x} y \rangle_{x,y} )^2 - 2 ( y' \tilde{x}'^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y})^{-1} \langle \tilde{x} y \rangle_{x,y} ) + (y')^2 \right\rangle_{x',y'} \\
+  &= \frac{1}{2} - \langle y \tilde{x}^\top \rangle_{x,y} (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y})^{-1} \langle \tilde{x} y \rangle_{x,y} \\
+  &= \frac{1}{2} - \frac{1}{2} \langle \tilde{x} \rangle_{x \mid y=1}^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x \mid y=1} + \langle \tilde{x} \tilde{x}^\top \rangle_{x \mid y=0})^{-1} \langle \tilde{x} \rangle_{x \mid y=1}. \label{eq:ols_loss}
+\end{align}
+In the final step, we assumed (WLOG) that the negative class is $y=0$ and the positive class is $y=1$.
+(Throughout, we also assume that the classes are balanced.)
+The question is: For fixed $p_{\xi_1}$ and $p_{\xi_2}$, how do we choose the gates $g_k$ to minimize \cref{eq:ols_loss}?
+\emph{I will have to think more about this.}
+
+\emph{After a bit more thinking...}
+% Let's momentarily remove the precision matrix.
+% Then, we are left with $\norm{ \langle \tilde{x} \rangle_{x \mid y=1} }_2^2$.
+% The best gating structure would make all the gates identical, because of the symmetry of $\tilde{x}$.
+% Let us now reconsider the precision matrix.
+% As we get close to having all identical gates, the precision matrix's determinant blows up to infinity??
+I think that the best precision matrix would be maximally diagonal (no clue if this actually true! but maybe it holds empirically?).
+For Gaussian data (at least), this mean that the blocks are independent conditioned on all the other blocks.
+Gates that tile the space without overlap would achieve this (I think?).
+But tbh I haven't got the slightest clue!!
+
+
+
+%% Example 1: Exclusive gates %%
+\subsection{Exclusive Gates}
+Let us assume that the gates are exclusive, that is, only one gate is active at a time.
+Then, $\Sigma^{xx}(p,q) = 0$ for $p \neq q$.
+
+% Note that $\Sigma^{xx}(p_1,p_2) = 0$ by the construction of our gates, since they are never both nonzero.
+Then $A$ becomes block diagonal.
+We can write the gradient flow for $w_1$ as
+% \begin{align}
+%   \tau \frac{d}{dt} W_1 &= \frac{1}{K} \left[ \Sigma^{yx}(p_1) - W_1 \Sigma^{xx}(p_1,p_1) \right]. \label{eq:grad_flow_exclusive}
+% \end{align}
+% So, we will only need to compute $\Sigma^{yx}(p_1)$ and $\Sigma^{xx}(p_1,p_1)$.
+
+% We also note that $W_1$ is a $1 \times n$ matrix.
+% Again, we relabel for simplicity. % in terms of $w_1 = W_1^\top$, which we view as an $n$-dimensional vector.
+% % Let us also write $b_1 = \Sigma^{yx}(p_1)^\top$ and $A = \Sigma^{xx}(p_1,p_1)$.
+% So,
+\begin{align}
+  K \tau \frac{d}{dt} w_1 &= - A_{11} w_1 + b_1.
+\end{align}
+
+Note that $A_{11} = \Sigma^{xx}(p_1, p_1)$ is always symmetric (and real).
+So, we can diagonalize it as $A_{11} = P \Lambda P^\top$, where the columns of $P$ are $v_1, \ldots, v_n$ and the diagonal entries of $\Lambda$ are $\lambda_1, \ldots, \lambda_n$.
+Let us introduce $u_1 = P^\top w_1$ and $c_1 = P^\top b_1$.
+Then,
+\begin{align}
+  K \tau \frac{d}{dt} u_1 &= - \Lambda u_1 + c_1. \label{eq:grad_flow_exclusive_reparam}
+\end{align}
+This ODE is solved by
+\begin{align}
+  u_1(t) &= \Lambda^{-1} e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + \Lambda^{-1} c_1,
+\end{align}
+where $C$ is a constant diagonal matrix that defines the initial condition.
+Then,
+\begin{align}
+  w_1(t) &= P \left( \Lambda^{-1} e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + \Lambda^{-1} c \right) \\
+  &= P \Lambda^{-1} e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + P \Lambda^{-1} c_1 \\
+  &= A_{11}^{-1} \left( P e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + b_1 \right).
+\end{align}
+% We can write $C$ in terms of $w(0)$, the initial condition, but it's messy:
+% \begin{align}
+%   % w(0) &= A^{-1} (P e^{ C } \mathbf{1} + b) \\
+%   % P^\top( A w(0) - b ) &= e^{C} \mathbf{1} \\
+%   % C_{ii} &= \log( (P^\top( A w(0) - b ))_i ),
+%   C_{ii} &= \log( v_i^\top ( A_{11} w_1(0) - b_1 ) ),
+% \end{align}
+% so I'll just stick with $C$.
+
+% where we absorb $P$ into $C$ since it is some arbitrary constant vector.
+Recalling $A_{11}$ and $b_1$,
+\begin{align}
+  w_1(t) &= ( \Sigma^{xx}(p_1,p_1) )^{-1} \left( P e^{ -\frac{t}{\tau} \Lambda + C } \mathbf{1} + \Sigma^{yx}(p_1)^\top \right).
+\end{align}
+So,
+\begin{align}
+  % W_1(\infty) &= w^\top(\infty) = (\Sigma^{yx}(p_1)) ( \Sigma^{xx}(p_1,p_1) )^{-1}.
+  w_1(\infty) &= ( \Sigma^{xx}(p_1,p_1) )^{-1} \left( P e^{ -\frac{t}{\tau} \Lambda + C } \mathbf{1} + \Sigma^{yx}(p_1)^\top \right).
+\end{align}
+As with above, this is the population solution to OLS, $(X^\top X)^{-1} X^\top y = ( \langle x x^\top \rangle )^{-1} ( \langle x y \rangle )$.
+
+So, each weight matrix converges to the OLS solution on the subset of the data determined by its gate.
+
+% In the limit,
+% \begin{align}
+%   \hat{y}(x) &= \frac{1}{K} \left( \sum_{k\in[K]} g_k(x) ( \Sigma^{xx}(p_k,p_k) )^{-1} \Sigma^{yx}(p_k)^\top \right) x \\
+%   &= \frac{1}{K} \left( \sum_{k\in[K]} ( \Sigma^{xx}(p_k,p_k) )^{-1} \Sigma^{yx}(p_k)^\top \right) x \\
+% \end{align}
+
+\subsection{Redundant Gates}
+What if $g_1 = g_2$?
+Then, $b_1 = b_2$ and $A_{11} = A_{12} = A_{22}$.
+So,
+% \begin{align}
+%   \tau \frac{d}{dt} W_1 
+%   &= \frac{1}{K} \left[ \Sigma^{yx}(p_1) - W_1 \Sigma^{xx}(p_1,p_1) - W_2 \Sigma^{xx}(p_1,p_2) \right], \\
+%   \tau \frac{d}{dt} W_2 &= \frac{1}{K} \left[ \Sigma^{yx}(p_2) - W_1 \Sigma^{xx}(p_2,p_1) - W_2 \Sigma^{xx}(p_2,p_2) \right].
+% \end{align}
+\begin{align}
+  K \tau \frac{d}{dt} w_1 &= - A_{11} (w_1 + w_2) + b_1 , \\
+  K \tau \frac{d}{dt} w_2 &= - A_{11} (w_1 + w_2) + b_1 .
+\end{align}
+Clearly, then, $w_1 - w_2$ is a constant vector.
+Moreover, $\frac{1}{2} (w_1 + w_2)$ evolves according to
+\begin{align}
+  \frac{K \tau}{2} \frac{d}{dt} (w_1 + w_2) &= - A_{11} (w_1 + w_2) + b_1.
+\end{align}
+Writing $2 \Delta = w_1 - w_2$ and $w_1 + w_2 = 2 (w_1 - \Delta)$, we have
+\begin{align}
+  K \tau \frac{d}{dt} w_1
+  &= K \tau \frac{d}{dt} (w_1 - \Delta)
+  = - 2 A_{11} (w_1 - \Delta) + b_1.
+\end{align}
+We can plug this into our solution from the previous section to get
+\begin{align}
+  w_1(t) &= \frac{1}{2} A_{11}^{-1} \left( P e^{-\frac{t}{K \tau} \Lambda + C} \mathbf{1} + b_1 \right).
+\end{align}
+So,
+\begin{align}
+  w_2(t) &= \frac{1}{2} A_{11}^{-1} \left( P e^{-\frac{t}{K \tau} \Lambda + C} \mathbf{1} + b_1 \right) - (w_1(0) - w_2(0)).
+\end{align}
+
+
+% Note $\Sigma^{xx}(p_1,p_2) = \Sigma^{xx}(p_2,p_1)$.
+% Define $A_{ij} = \Sigma^{xx}(p_i,p_j)$ and $b_i = \Sigma^{yx}(p_i)^\top$.
+% Let $w_i = W_i^\top$.
+% Then,
+% \begin{align}
+%   K \tau \frac{d}{dt} w_1 &= b_1 - A_{11} w_1 - A_{12} w_2, \\
+%   K \tau \frac{d}{dt} w_2 &= b_2 - A_{12} w_1 - A_{22} w_2.
+% \end{align}
+
+% So,
+% \begin{align}
+%   &\frac{K \tau}{2} \frac{d}{dt} \langle w_1 - w_2, w_1 - w_2 \rangle \\
+%   &= K \tau \langle w_1 - w_2, \frac{d}{dt} w_1 - \frac{d}{dt} w_2 \rangle \\
+%   &= \langle w_1 - w_2, (b_1 - A_{11} w_1 - A_{12} w_2) - (b_2 - A_{12} w_1 - A_{22} w_2) \rangle \\
+%   &= \langle w_1 - w_2, (b_1 - b_2) + (A_{12} - A_{11}) w_1 - (A_{12} - A_{22}) w_2 \rangle \\
+%   &= \langle w_1 - w_2, (b_1 - b_2) + (A_{12} - A_{11}) (w_1 - w_2) + ((A_{12} - A_{11}) - (A_{12} - A_{22})) w_2 \rangle \\
+% \end{align}
+
+% Note
+% \begin{align}
+%   &\frac{d}{dt} \langle w_1, w_2 \rangle \\
+%   &= \langle \frac{d}{dt} w_1, w_2 \rangle + \langle w_1, \frac{d}{dt} w_2 \rangle \\
+%   &\propto \langle b_1 - A_{11} w_1 - A_{12} w_2, w_2 \rangle + \langle w_1, b_2 - A_{12} w_1 - A_{22} w_2 \rangle \\
+%   &= \langle b_1, w_2 \rangle - \langle A_{11} w_1, w_2 \rangle - \langle A_{12} w_2, w_2 \rangle + \langle w_1, b_2 \rangle - \langle A_{12} w_1, w_1 \rangle - \langle w_1, A_{22} w_2 \rangle \\
+%   &= \langle b_1, w_2 \rangle + \langle w_1, b_2 \rangle - (\langle A_{12} w_2, w_2 \rangle + \langle A_{12} w_1, w_1 \rangle) - (\langle A_{11} w_1, w_2 \rangle + \langle A_{22} w_1, w_2 \rangle) \\
+%   &= \langle b_1, w_2 \rangle + \langle w_1, b_2 \rangle - (\langle A_{12} (w_1+w_2), w_1+w_2 \rangle - 2 \langle A_{12} w_1, w_2 \rangle) - (\langle A_{11} w_1, w_2 \rangle + \langle A_{22} w_1, w_2 \rangle).
+% \end{align}
+% If we assume $w_1(0) = w_2(0)$, then
+% \begin{align}
+%   \left. \frac{d}{dt} \langle w_1, w_2 \rangle \right|_{t=0}
+%   &= \langle b_1, w_1 \rangle - \langle A_{11} w_1, w_1 \rangle - \langle A_{12} w_1, w_1 \rangle + \langle w_1, b_2 \rangle - \langle A_{12} w_1, w_1 \rangle - \langle w_1, A_{22} w_1 \rangle
+% \end{align}
+
+
+\section{Theory-driven Experiments}
+
+\subsection{General Case}
+
+\subsection{Single Gate}
+
+\subsection{Redundant Gates}
+
+
+\section{Next Steps}
+Concerns:
+
+Questions:
+
+Some ideas:
+\begin{enumerate}
+  \item Let the gates vary during training. 
+  That is, $g$ depends on $t$ and $x$.
+  So, $\Sigma^{yx}$ and $\Sigma^{xx}$ will depend on $t$ as well.
+  We can still solve the differential equation, and we may be able to use the same basis to diagonalize across time (Toeplitz/circulant properties? DFT?).
+\end{enumerate}
+
+\end{document}
