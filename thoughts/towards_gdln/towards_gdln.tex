@@ -19,9 +19,9 @@
 %%%%%%%%%%%%%%%%%
 \section{The Problem}
 We consider a feedforward neural network with a single hidden layer and activation function $\sigma$.
-It receives an input $x \in \R^L$ and produces a scalar output $\hat{y} \in \R$.
+It receives an input $x \in \R^n$ and produces a scalar output $\hat{y} \in \R$.
 The hidden layer has $K$ units.
-The weights for the first and second layer are $W_1 \in \R^{K \times L}$ and $W_2 \in \R^{1 \times K}$, respectively, and the corresponding biases are $b_1 \in \R^K$ and $b_2 \in \R$.
+The weights for the first and second layer are $W_1 \in \R^{K \times n}$ and $W_2 \in \R^{1 \times K}$, respectively, and the corresponding biases are $b_1 \in \R^K$ and $b_2 \in \R$.
 \begin{align}
   \hat{y} &= W_2 \sigma( W_1 x + b_1 ) + b_2. \label{eq:model}
 \end{align}
@@ -39,7 +39,7 @@ For $\sigma = \text{ReLU}$, one can further remove the bias terms $b_1$ and $b_2
 
 We consider two types of datasets: the nonlinear Gaussian process (NLGP) and the single pulse (SP).
 We explain them in more detail later.
-They differ primarily in that the former has continuous support on $\R^L$, while the latter has discrete support on a subset of $\{ 0, 1 \}^L$.
+They differ primarily in that the former has continuous support on $\R^n$, while the latter has discrete support on a subset of $\{ 0, 1 \}^n$.
 The former also has a gain parameter that controls the degree of localization, while the latter does not. 
 
 Motivated by localization with the ReLU model, we tried to see how well a gated deep linear network (GDLN) could do.
@@ -87,32 +87,39 @@ If this is so, then it would be reasonable to try using a standard GDLN to model
 \subsection{Model}
 Our GDLN model is defined as follows:
 \begin{align}
-  \hat{y}(x) &= \frac{1}{K} \left( \sum_{k \in [K]} g_k(x) W_k \right) x, \label{eq:gdln_model}
+  \hat{y}(x) &= \frac{1}{K} \left( \sum_{k \in [K]} g_k(x) w_k^\top \right) x, \label{eq:gdln_model}
 \end{align}
-where $g_k$ are (node) gates.
+where $g_k$ are (node) gates, and $w_k \in \R^n$ are the rows of the first-layer weight matrix $W_1 \in \R^{K \times n}$.
+That is,
+\begin{align}
+  W_1 &= \begin{pmatrix} w_1^\top \\ \vdots \\ w_K^\top \end{pmatrix}
+\end{align}
 
 %% Gradient Flow %%
 \subsection{Gradient Flow}
-Recalling the GDLN paper, the gradient flow for $W_1$ is given by
+Recalling the GDLN paper, the gradient flow for $w_1$ is given by
 \begin{align}
-  \tau \frac{d}{dt} W_1 &= \frac{1}{K} \left[ \Sigma^{yx}(p_1) - \sum_{k \in [K]} W_k \Sigma^{xx}(p_1,p_k) \right], \label{eq:grad_flow}
+  \tau \frac{d}{dt} w_1^\top &= \frac{1}{K} \left[ \Sigma^{yx}(p_1) - \sum_{k \in [K]} w_k^\top \Sigma^{xx}(p_1,p_k) \right], \label{eq:grad_flow}
 \end{align}
 where
 \begin{align}
-  \Sigma^{yx}(p) &= \left\langle g_p y x^\top \right\rangle_{x,y} \\
-  \Sigma^{xx}(p,q) &= \left\langle g_p g_q x x^\top \right\rangle_{x,y}.
+  \Sigma^{yx}(p_i) &= \left\langle g_i y x^\top \right\rangle_{g,x,y} \\
+  \Sigma^{xx}(p_i,p_j) &= \left\langle g_i g_j x x^\top \right\rangle_{g,x,y}.
 \end{align}
+Because we typically take $g$ to be a deterministic function of $x$, I will often suppress the dependence on $g$ in the expectation.
 
 \subsection{General Case}
-Let us relabel $w_i = W_i^\top$, $b_i = \Sigma^{yx}(p_i)^\top$, and $A_{ij} = \sigma^{xx}(p_i,p_j)$.
+Let us relabel %$w_i = W_i^\top$, 
+$b_i = \Sigma^{yx}(p_i)^\top$ and $A_{ij} = \Sigma^{xx}(p_i,p_j)$.
 Note that $A_{ij}$ is symmetric and $A_{ij} = A_{ji}$.
 Then, we can write the gradient flow for all weights as
 \begin{align}
   K \tau \frac{d}{dt} \underbrace{\begin{bmatrix} w_1 \\ \vdots \\ w_K \end{bmatrix}}_{w \in \R^{Kn}}
   &= \underbrace{\begin{bmatrix} b_1 \\ \vdots \\ b_k \end{bmatrix}}_{b \in \R^{Kn}} - \underbrace{\begin{bmatrix} A_{11} & \cdots & A_{1K} \\ \vdots & \ddots & \vdots \\ A_{K1} & \cdots & A_{KK} \end{bmatrix}}_{A \in \R^{Kn \times Kn}} \begin{bmatrix} w_1 \\ \vdots \\ w_K \end{bmatrix}.
 \end{align}
-Observe that $w$ is the vectorized form of our $K \times L$ first-layer weight matrix.
+Observe that $w$ is the vectorized form of our $K \times n$ first-layer weight matrix.
 Note also that $A$ is a symmetric real matrix, so we can diagonalize it as $A = P \Lambda P^\top$, where the columns of $P$ are the eigenvectors of $A$ and the diagonal entries of $\Lambda$ are the corresponding (nonnegative) eigenvalues.
+(It is symmetric because $A$ is block symmetric with blocks $A_{ij}$, and the blocks are also symmetric.)
 We can reparameterize in terms of $u = P^\top w$ and $c = P^\top b$.
 \begin{align}
   K \tau \frac{d}{dt} u &= - \Lambda u + c
