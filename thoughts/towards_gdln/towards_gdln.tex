@@ -44,18 +44,38 @@ The former also has a gain parameter that controls the degree of localization, w
 
 Motivated by localization with the ReLU model, we tried to see how well a gated deep linear network (GDLN) could do.
 Next, we'll provide some experimental support for why this might work, and then do some analysis. 
-We'll conclude with some questions and concerns.
+We'll conclude with some questions, concerns, and ideas.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Have You Tried Making It Linear? %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Have You Tried Making It Linear?}
-\subsection{Sign-flipping}
 
-\subsection{Predicting loca(liza)tion}
+Gating lets us decompose the ReLU post-activation in terms of the pre-activation's sign and magnitude.
+\begin{align}
+  \text{ReLU}( \langle w_1, x \rangle ) &= g(x) \langle w_1, x \rangle \qquad \text{where} \qquad g(x) = \mathbbm{1}( \langle w_1, x \rangle \geq 0 ).
+\end{align}
+We generally assume that $g$ does not vary during learning.
+Later on, we'll try to analyze what happens when this does not hold.
 
-\subsection{Evolving gates?}
+To assess the validity of this assumption, we need to see how much $g(x)$, as defined above, changes during learning.
+Additionally, post-hoc, we can usually pick a somewhat sensible gating structure that mimics a specific run's behavior.
+But we'd like to be able to determine this gating upfront.
+We explore all this in the following subsections.
+
+\subsection{Sign Flipping}
+
+Note that $g$ is invariant to the scale of $w_1$.
+We've observed in previous experiments that $w_1$ appears to grow uniformly in size during much of its training.
+(There is, importantly, a phase where it goes from Gaussian to non-Gaussian, but the localization seems to be more likely to occur around its mode.)
+This suggests that $g(x)$ may be relatively constant during learning.
+If this is so, then it would be reasonable to try using a standard GDLN to model the ReLU network.
+
+
+\subsection{Predicting Loca(liza)tion}
+
+\subsection{Evolving Gates?}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -91,7 +111,8 @@ Then, we can write the gradient flow for all weights as
   K \tau \frac{d}{dt} \underbrace{\begin{bmatrix} w_1 \\ \vdots \\ w_K \end{bmatrix}}_{w \in \R^{Kn}}
   &= \underbrace{\begin{bmatrix} b_1 \\ \vdots \\ b_k \end{bmatrix}}_{b \in \R^{Kn}} - \underbrace{\begin{bmatrix} A_{11} & \cdots & A_{1K} \\ \vdots & \ddots & \vdots \\ A_{K1} & \cdots & A_{KK} \end{bmatrix}}_{A \in \R^{Kn \times Kn}} \begin{bmatrix} w_1 \\ \vdots \\ w_K \end{bmatrix}.
 \end{align}
-Note that $A$ is a symmetric real matrix, so we can diagonalize it as $A = P \Lambda P^\top$, where the columns of $P$ are the eigenvectors of $A$ and the diagonal entries of $\Lambda$ are the corresponding (nonnegative) eigenvalues.
+Observe that $w$ is the vectorized form of our $K \times L$ first-layer weight matrix.
+Note also that $A$ is a symmetric real matrix, so we can diagonalize it as $A = P \Lambda P^\top$, where the columns of $P$ are the eigenvectors of $A$ and the diagonal entries of $\Lambda$ are the corresponding (nonnegative) eigenvalues.
 We can reparameterize in terms of $u = P^\top w$ and $c = P^\top b$.
 \begin{align}
   K \tau \frac{d}{dt} u &= - \Lambda u + c
@@ -114,10 +135,10 @@ If we write
 then $A = \langle \tilde{x} \tilde{x}^\top \rangle_{x,y}$ and $b = \langle \tilde{x} y \rangle_{x,y}$.
 Then, it is clear that this is the population solution to the OLS problem of regressing $y$ on $\tilde{x}$.
 
-In this context, one might ask, which gating structure minimizes the OLS loss?
-The OLS error is
+In this context, one might ask, which gating structure minimizes the MSE loss?
+The loss is
 \begin{align}
-  &\left\langle \left( \tilde{x}'^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y})^{-1} \langle \tilde{x} y \rangle_{x,y} - y' \right)^2 \right\rangle_{x',y'} \\
+  \LL_{OLS} &= \left\langle \left( \tilde{x}'^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y})^{-1} \langle \tilde{x} y \rangle_{x,y} - y' \right)^2 \right\rangle_{x',y'} \\
   &= \left\langle ( \tilde{x}'^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y})^{-1} \langle \tilde{x} y \rangle_{x,y} )^2 - 2 ( y' \tilde{x}'^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y})^{-1} \langle \tilde{x} y \rangle_{x,y} ) + (y')^2 \right\rangle_{x',y'} \\
   &= \frac{1}{2} - \langle y \tilde{x}^\top \rangle_{x,y} (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y})^{-1} \langle \tilde{x} y \rangle_{x,y} \\
   &= \frac{1}{2} - \frac{1}{2} \langle \tilde{x} \rangle_{x \mid y=1}^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x \mid y=1} + \langle \tilde{x} \tilde{x}^\top \rangle_{x \mid y=0})^{-1} \langle \tilde{x} \rangle_{x \mid y=1}. \label{eq:ols_loss}
@@ -137,6 +158,19 @@ I think that the best precision matrix would be maximally diagonal (no clue if t
 For Gaussian data (at least), this mean that the blocks are independent conditioned on all the other blocks.
 Gates that tile the space without overlap would achieve this (I think?).
 But tbh I haven't got the slightest clue!!
+
+\emph{After an even littler bit of thinking...}
+It may be useful to write this in terms of Kronecker products.
+Let
+\begin{align}
+  \tilde{g}(x) &= \begin{bmatrix} g_1(x) \\ \vdots \\ g_K(x) \end{bmatrix} \in \{ 0,1 \}^K.
+\end{align}
+Then, minimizing \cref{eq:ols_loss} is equivalent to maximizing
+\begin{align}
+  \LL^*(\tilde{g}) &= \langle \tilde{g} \otimes x \rangle_{x \mid y=1}^\top (\langle ( \tilde{g} \otimes x ) ( \tilde{g} \otimes x )^\top \rangle_{x \mid y=1} + \langle ( \tilde{g} \otimes x ) ( \tilde{g} \otimes x )^\top \rangle_{x \mid y=0})^{-1} \langle \tilde{g} \otimes x \rangle_{x \mid y=1} \label{eq:ols_kron}
+\end{align}
+% So, we want to maximize \cref{eq:ols_kron} 
+over $\tilde{g} : \supp(p) \to \{0,1\}^K$.
 
 
 
@@ -295,7 +329,7 @@ Some ideas:
   \item Let the gates vary during training. 
   That is, $g$ depends on $t$ and $x$.
   So, $\Sigma^{yx}$ and $\Sigma^{xx}$ will depend on $t$ as well.
-  We can still solve the differential equation, and we may be able to use the same basis to diagonalize across time (Toeplitz/circulant properties? DFT?).
+  We can still solve the differential equation, and we may be able to use a single basis to diagonalize them across time (Toeplitz/circulant properties? DFT?).
 \end{enumerate}
 
 \end{document}
