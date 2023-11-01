@@ -15,15 +15,15 @@ from nets.datasets.base import ExemplarType
 
 from jax.scipy.special import erf as gain_function
 
-from line_profiler import LineProfiler
+#from line_profiler import LineProfiler
 #
-profiler = LineProfiler()
-def profile(func):
-   def inner(*args, **kwargs):
-       profiler.add_function(func)
-       profiler.enable_by_count()
-       return func(*args, **kwargs)
-   return inner
+#profiler = LineProfiler()
+#def profile(func):
+#   def inner(*args, **kwargs):
+#       profiler.add_function(func)
+#       profiler.enable_by_count()
+#       return func(*args, **kwargs)
+#   return inner
 
 def slice_to_array(s: slice, array_length: int):
   """Convert a `slice` object to an array of indices."""

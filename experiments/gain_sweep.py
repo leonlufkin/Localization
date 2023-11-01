@@ -31,9 +31,9 @@ if __name__ == '__main__':
         # can set `export RESULTS_HOME="..." external to Python or
         # change the below.
         log_dir=Path(
-            os.path.join(os.environ.get("LOGS_HOME"), "conv-emergence-jax")
+            os.path.join(os.environ.get("LOGS_HOME"), "gain_sweep")
             if os.environ.get("LOGS_HOME") is not None
-            else os.path.join("/tmp", os.environ.get("USER"), "conv-emergence-jax"),
+            else os.path.join("/tmp", os.environ.get("USER"), "gain_sweep"),
             get_timestamp(),
         ),
         # NOTE: Use `cluster="debug"` to simulate a SLURM launch locally.

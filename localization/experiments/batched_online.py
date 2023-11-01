@@ -481,7 +481,7 @@ def simulate(
   df = pd.DataFrame(metrics)
   df['epoch'] = np.minimum(df.index * evaluation_interval, num_epochs)
   if save_:
-    dir_ = "/Users/leonlufkin/Documents/GitHub/Localization/localization/results/weights" if gethostname() == 'Leons-MBP' else "/ceph/scratch/leonl/results/jax_results"
+    dir_ = "/Users/leonlufkin/Documents/GitHub/Localization/localization/results/weights" if gethostname() == 'Leons-MBP' else "/ceph/scratch/leonl/results/gain_sweep"
     # os.makedirs(f"results/weights/", exist_ok=True)
     np.savez(f"{dir_}/{path_key}.npz", weights=weights, metrics=df.to_numpy()[:,:-1])
 
