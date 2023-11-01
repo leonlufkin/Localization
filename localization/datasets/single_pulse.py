@@ -139,17 +139,25 @@ class SinglePulseDataset(Dataset):
 
 if __name__ =="__main__":
     key = jax.random.PRNGKey(0)
-    dataset = SinglePulseDataset(key=key, xi1=10, xi2=99, num_dimensions=100)
-    print(len(dataset))
-    print(dataset[:1000][0].min())
-    print(dataset[:1000][0].max())
-    from nets import samplers
-    sampler = samplers.EpochSampler(
-        key=key,
-        dataset=dataset,
-        num_epochs=1,
-    )
-    print(len(sampler))
-    print(sampler[:1][0])
-    print(sampler[:1][1])
-    print(sampler[:1][0].shape, sampler[:1][1].shape)
+    xi1, xi2 = (0.4, 0.5), (0.0, 0.1)
+    dataset = SinglePulseDataset(key=key, xi1=xi1, xi2=xi2, num_dimensions=40, num_exemplars=100000)
+    x, y = dataset[:100000]
+    xx = (x.T @ x) / len(x)
+    import matplotlib.pyplot as plt
+    im = plt.imshow(xx, cmap='gray')
+    cbar = plt.colorbar(im)
+    plt.savefig(f'../thoughts/towards_gdln/figs/sp_covariance_({xi1[0]},{xi1[1]}]_({xi2[0]},{xi2[1]}].png')
+    plt.close()
+    
+    # print(dataset[:1000][0].min())
+    # print(dataset[:1000][0].max())
+    # from nets import samplers
+    # sampler = samplers.EpochSampler(
+    #     key=key,
+    #     dataset=dataset,
+    #     num_epochs=1,
+    # )
+    # print(len(sampler))
+    # print(sampler[:1][0])
+    # print(sampler[:1][1])
+    # print(sampler[:1][0].shape, sampler[:1][1].shape)

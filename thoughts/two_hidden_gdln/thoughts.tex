@@ -1,0 +1,80 @@
+% GO TO: /Users/leonlufkin/Library/texmf/tex/latex
+%        to add custom packages to the path
+\documentclass{article}
+\usepackage{report}
+
+\title{Receptive Field Localization}
+\author{Leon Lufkin}
+\date{\today}
+
+\makeatletter
+\let\Title\@title
+\let\Author\@author
+\let\Date\@date
+
+\begin{document}
+
+%%%%%%%%%%%
+%% Model %%
+%%%%%%%%%%%
+\section{Model}
+We consider a very simple case of the model used in Alessandro's paper.
+We set $L = 40$ (number of inputs units) and $K = 2$ (number of hidden units).
+Our analysis is motivated by a model using ReLU activation.
+However, we will consider a gated deep linear net (GDLN) implementation of the model.
+
+Our model is defined as follows:
+\begin{align}
+  \hat{y}(x) &= \frac{1}{2} \left( g_1(x) W_1 + g_2(x) W_2 \right) x, \label{eq:model}
+\end{align}
+where $g_1$ and $g_2$ are node gates.
+
+We will consider node gates of the form:
+\begin{align}
+  g_1(x) &= \mathbbm{1}( \langle x, e_i \rangle \geq 0 ) \\
+  g_2(x) &= \mathbbm{1}( \langle x, -e_i \rangle \geq 0 ).
+\end{align}
+So, $g_1(x) = 1 - g_2(x)$.
+We call this the ``small bump'' gate, as the gate is turned on (or off) when the input is positive in the $i$-th entry.
+Note $i$ is fixed.
+
+%%%%%%%%%%%%%%%%%%%
+%% Gradient Flow %%
+%%%%%%%%%%%%%%%%%%%
+\section{Gradient Flow}
+Recalling the result from the GDLN paper:
+\begin{align}
+  \tau \frac{d}{dt} W_1 &= \frac{1}{2} \left[ \Sigma^{yx}(p_1) - W_1 \Sigma^{xx}(p_1,p_1) - W_2 \Sigma^{xx}(p_1,p_2) \right], \label{eq:grad_flow}
+\end{align}
+where
+\begin{align}
+  \Sigma^{yx}(p) &= \left\langle g_p y x^\top \right\rangle_{x,y} \\
+  \Sigma^{xx}(p,q) &= \left\langle g_p g_q x x^\top \right\rangle_{x,y}.
+\end{align}
+
+Note that $\Sigma^{xx}(p_1,p_2) = 0$ by the construction of our gates, since they are never both nonzero.
+So, we want to compute $\Sigma^{yx}(p_1)$ and $\Sigma^{xx}(p_1,p_1)$.
+
+We compute the former to be:
+\begin{align}
+  \Sigma^{yx}(p_1) &= \frac{1}{\pi} \left[ \tan^{-1} \left( \sqrt{ \frac{ \rho_{ik}^2 }{ \frac{1}{2g^2} + (1 - \rho_{ik}^2) } } \right) \right]_k^\top, \label{eq:sig_yx}
+  &&\rho_{ik} = \exp\left( - \frac{(i-k)^2}{\xi_1^2} \right).
+\end{align}
+
+The latter is:
+\begin{align}
+  \Sigma^{xx}(p_1,p_1) &= \frac{1}{\pi} \tan^{-1} \left( \sqrt{2} \frac{\rho_{ik} + a_i}{\sqrt{1 + 2 a_k^2 \sigma_1^2}} \right) \\
+  a_i &= \frac{ \rho_{kl} - \rho_{il} \rho_{ik} }{ 1 - \rho_{ik}^2 } c \\
+  a_k &= \frac{ \rho_{il} - \rho_{kl} \rho_{ik} }{ 1 - \rho_{ik}^2 } c \\
+  c &= \frac{g}{\sqrt{1 + 2 g^2 \sigma^2}} \\
+  \sigma^2 &= 1 - \frac{1}{1-\rho_{ik}^2} \left( \rho_{il}^2 - 2 \rho_{ik} \rho_{il} \rho_{kl} + \rho_{kl}^2 \right) \\
+  &= \frac{1}{1-\rho_{ik}^2} \left( 1 - \rho_{ik}^2 - \rho_{il}^2 - \rho_{kl}^2 + 2 \rho_{ik} \rho_{il} \rho_{kl} \right)
+\end{align}
+(This looks wrong tbh. See Desmos. First one is right tho.)
+
+(Also I have no idea how to decouple the ODEs with these matrices.)
+
+
+
+
+\end{document}

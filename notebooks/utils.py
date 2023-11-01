@@ -105,7 +105,7 @@ def plot_rf_evolution(weights, num_rows=2, num_cols=4, figsize=(15, 5), cmap='gr
     fig, axs = plt.subplots(num_rows, num_cols, figsize=figsize, sharex=True, sharey=True)
     cmap_ = plt.get_cmap(cmap)
     color = cmap_(np.linspace(0.2, 0.8, weights.shape[0]))
-    for i, ax in enumerate(axs.flatten()):
+    for i, ax in enumerate(axs.flatten() if isinstance(axs, np.ndarray) else [axs]):
         for t in range(weights.shape[0]):
             ax.plot(weights[t,i,:], color=color[t], alpha=0.5)
     return fig, axs

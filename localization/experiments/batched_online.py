@@ -105,6 +105,8 @@ def eval_step(
   d = {
     "loss": elementwise_loss.mean(),
     "accuracy": elementwise_acc.mean(),
+    # "mean pred_y": jnp.mean(pred_y),
+    # "mean y": jnp.mean(y),
   }
   if bias is not None:
     d.update({"bias": bias})
@@ -117,12 +119,18 @@ def summarize_metrics(metrics):
   loss = metrics['loss'].mean(0)
   acc = metrics['accuracy'].mean(0)
   # bias = metrics['bias'].mean(0)
+  # mean_y = metrics['mean y'].mean(0)
+  # mean_pred_y = metrics['mean pred_y'].mean(0)
   with np.printoptions(precision=2):
     return (
       "\tloss:"
       f"\t\t{loss}"
       "\n\taccuracy:"
       f"\t{acc}"
+      # "\n\tmean y:"
+      # f"\t\t{mean_y}"
+      # "\n\tmean pred_y:"
+      # f"\t{mean_pred_y}"
     )
 
 def metrics_to_dict(metrics: Mapping[str, Array]) -> dict:
@@ -130,7 +138,8 @@ def metrics_to_dict(metrics: Mapping[str, Array]) -> dict:
   iteration = metrics["training iteration"]
   loss = metrics["loss"].mean(0)
   acc = metrics["accuracy"].mean(0)
-  d = {"iteration": iteration, "loss": loss, "accuracy": acc}
+  # mean_pred_y, mean_y = metrics["mean pred_y"].mean(0), metrics["mean y"].mean(0)
+  d = {"iteration": iteration, "loss": loss, "accuracy": acc}#, "mean pred_y": mean_pred_y, "mean y": mean_y}
   if "bias" in metrics.keys():
     d["bias"] = metrics["bias"].mean(0)
   return d
@@ -250,6 +259,7 @@ def simulate(
   sampler_cls: type[samplers.Sampler] = samplers.OnlineSampler,
   wandb_: bool = False,
   save_: bool = True,
+  evaluation_interval: int | None = None,
   **kwargs, # extra kwargs
 ) -> tuple[pd.DataFrame, ...]:
   """Simulate in-context learning of classification tasks."""
@@ -340,6 +350,8 @@ def simulate(
     num_dimensions=num_dimensions,
     num_exemplars=1000,#max(20*batch_size,1000),
   )
+  
+  # import ipdb; ipdb.set_trace()
 
   print(f"Length of train dataset: {len(train_dataset)}")
   print(f"Length of eval dataset: {len(eval_dataset)}")
@@ -367,7 +379,8 @@ def simulate(
   
   print(f"Length of train sampler: {len(train_sampler)}")
   print(f"Length of eval sampler: {len(eval_sampler)}")
-
+  
+  # import ipdb; ipdb.set_trace()
 
   #########
   # Model setup.
@@ -404,7 +417,8 @@ def simulate(
 
   # Training starts at iteration 1.
   next(itercount)
-  evaluation_interval = min(500, max(num_epochs // 10, 1))
+  if evaluation_interval is None:
+    evaluation_interval = min(500, max(num_epochs // 10, 1))
   print(f"Evaluating every {evaluation_interval} training steps.")
   if evaluation_interval == 0:
     raise ValueError("Too many `evaluations_per_epoch`.")
@@ -426,6 +440,9 @@ def simulate(
   weights.append(model.fc1.weight) #if gethostname() == 'Leons-MBP' else save_model_weights(train_step_num=0)
   
   for epoch, (x, y) in enumerate(batcher(train_sampler, batch_size)):
+    # print(f"mean(y) = {jnp.mean(y)}")
+    # print(x)
+    # print(y)
     (train_key,) = jax.random.split(train_key, 1)
     train_step_num = int(next(itercount))
     train_loss, model, opt_state = train_step(
@@ -476,23 +493,23 @@ if __name__ == '__main__':
   config = dict(
     seed=0,
     num_dimensions=40,
-    num_hiddens=100,
-    gain=3,
+    num_hiddens=40,
+    gain=0.01,#3,
     init_scale=1.0,
     activation='relu',
     model_cls=models.SimpleNet,
     use_bias=False,
     optimizer_fn=optax.sgd,
-    learning_rate=10.0,
-    batch_size=1000,
-    num_epochs=5000,
+    learning_rate=0.5,#10.0,
+    batch_size=1000,#1000,
+    num_epochs=1000,#500,
     # dataset_cls=datasets.SinglePulseDataset,
     # xi1=(0.2, 0.25), # (20, 25),
     # xi2=(0.05, 0.1), #(5, 10), # (5, 10),
     dataset_cls=datasets.NonlinearGPDataset,
     xi1=2,
     xi2=1,
-    support=(0.0, 1.0),
+    support=(-1.0, 1.0),
     class_proportion=0.5,
     sampler_cls=samplers.EpochSampler,
     init_fn=models.xavier_normal_init,

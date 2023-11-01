@@ -3,7 +3,6 @@ from jax import Array
 
 import jax
 import jax.numpy as jnp
-from jax import random
 from functools import partial
 
 # from nets.datasets.base import Dataset
@@ -36,7 +35,7 @@ def slice_to_array(s: slice, array_length: int):
 
 
 class NonlinearGPDataset(Dataset):
-  """Nonlinear Gaussian Process dataset."""
+  """Gaussian control for Nonlinear Gaussian Process dataset."""
 
   def __init__(
     self,
@@ -61,11 +60,12 @@ class NonlinearGPDataset(Dataset):
 
     # Compile a function for sampling exemplars at `Dataset.__init__`.
     def Z(g):
-        return jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (g**2) / (1 + (g**2)) ) )
+        return jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) ) )
     
     # @profile
     def generate_non_gaussian(key, xi, L, g):
         C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
+        C = jnp.minimum(C, L - C)
         C = jnp.exp(-C ** 2 / (xi ** 2))
         z = jax.random.multivariate_normal(key, jnp.zeros(L), C, method="svd") # FIXME: using svd for numerical stability, breaks if xi > 2.5 ish
         x = gain_function(g * z) / Z(g)
@@ -76,8 +76,6 @@ class NonlinearGPDataset(Dataset):
       label_key, exemplar_key = jax.random.split(key, 2)
       label = jax.random.bernoulli(label_key, p=class_proportion)
       xi = jnp.where(label, xi1, xi2)
-      # label = 1.
-      # xi = xi1
       exemplar = generate_non_gaussian(exemplar_key, xi, L, g)
       label = 2 * jnp.float32(label) - 1
       return exemplar, label
@@ -108,14 +106,14 @@ class NonlinearGPDataset(Dataset):
     )
     
     # Adjust support
-    z = Z(gain)
-    self.adjust_support = jax.jit(
-      jax.vmap(
-        partial(lambda x, support: (x * z + 1) * (support[1] - support[0]) / 2 + support[0],
-                support=support)
-        )
-    )
-    
+    # z = Z(gain)
+    # self.adjust_support = jax.jit(
+    #   jax.vmap(
+    #     partial(lambda x, support: (x * z + 1) * (support[1] - support[0]) / 2 + support[0],
+    #             support=support)
+    #     )
+    # )
+    self.adjust_support = lambda x: x
 
   @property
   def exemplar_shape(self) -> tuple[int]:
@@ -131,9 +129,13 @@ class NonlinearGPDataset(Dataset):
       if index.stop is None:
         raise ValueError("Slice `index.stop` must be specified.")
       index = slice_to_array(index, len(self))
+      n = index.shape[0]
+    elif isinstance(index, int):
+      # index = jnp.array([index])
+      n = 1
     else:
-      index = index
-    n = index.shape[0]
+      index = jnp.array(index)
+      n = index.shape[0]
 
     keys = jax.vmap(jax.random.fold_in, in_axes=(None, 0))(self.key, index)
     if isinstance(index, int):
@@ -161,38 +163,53 @@ class NonlinearGPDataset(Dataset):
 
 if __name__ =="__main__":
     key = jax.random.PRNGKey(0)
-    dataset = NonlinearGPDataset(key=key, xi1=0.1, xi2=1.1, gain=1., num_dimensions=100, num_exemplars=1e4)
-    batch_size = 1000
-    print(len(dataset))
-    # import time
-    # start_time = time.time()
-    # def run_(dataset, batch_size):
-      # for i in range(0, len(dataset), batch_size):
-      #   x, y = dataset[i:i+batch_size]
-    # print("--- %s seconds ---" % (time.time() - start_time))
+    xi1, xi2, gain = 5, 1, 3
+    print("xi1, xi2, gain:", xi1, xi2, gain)
+    dataset = NonlinearGPDataset(key=key, xi1=xi1, xi2=xi2, gain=gain, num_dimensions=40, num_exemplars=10000)
+    x, y = dataset[:10000]
+    xx = (x.T @ x) / len(x)
     
-    # import cProfile
-    # cProfile.runctx('run_(dataset, batch_size)', 
-    #                 locals={},
-    #                 globals={'run_': run_, 'dataset': dataset, 'batch_size': batch_size},
-    #                 filename='nlgp_jax_stats',
-    #                 )
+    import matplotlib.pyplot as plt
+    im = plt.imshow(xx, cmap='gray')
+    cbar = plt.colorbar(im)
+    plt.savefig(f'../../thoughts/towards_gdln/figs/nlgp_covariance_{xi1}_{xi2}_{gain}.png')
+    plt.close()
     
-    # cProfile.run('dataset.__getitem__(slice(0, len(dataset)))', 
-    #                 # locals={},
-    #                 # globals={'dataset': dataset, },
-    #                 filename='nlgp_jax_stats',
-    #                 )
-
-    # import pstats
-    # p = pstats.Stats('nlgp_jax_stats')
-    # from pstats import SortKey
-    # p.sort_stats(SortKey.CUMULATIVE).print_stats(.01)
     
-    # dataset.__getitem__(slice(0, len(dataset)))
-    for i in range(0, len(dataset), batch_size):
-      x, y = dataset.__getitem__(slice(i, i+batch_size))
-    print(profiler.print_stats())
+    # xx_inv = jnp.linalg.inv(xx)
+    # # w = 
+    # plt.plot(w)
+    # plt.savefig(f'../thoughts/towards_gdln/figs/nlgp_w_{xi1}_{xi2}_{gain}.png')
+    # plt.close()
+    
+    
+    # g = x[:,3]
+    gaussian_noise = jax.random.normal(jax.random.PRNGKey(0), shape=(40,))
+    g = jnp.dot(x, gaussian_noise)
+    # gaussian_bump = jnp.exp( -0.5 * ((jnp.arange(40) - 5) / 2) ** 2 )
+    # g = jnp.dot(x, gaussian_bump)
+    x_ = x[g > 0]
+    xx_ = (x_.T @ x_) / len(x_)
+    print(len(x_))
+    im = plt.imshow(xx_, cmap='gray')
+    cbar = plt.colorbar(im)
+    plt.savefig(f'../../thoughts/towards_gdln/figs/nlgp_gated_covariance_{xi1}_{xi2}_{gain}.png')
+    plt.close()
+    e_, v_ = jnp.linalg.eigh(xx_)
+    print(e_)
+    im = plt.imshow(v_, cmap='gray')
+    cbar = plt.colorbar(im)
+    plt.savefig(f'../../thoughts/towards_gdln/figs/nlgp_gated_v_{xi1}_{xi2}_{gain}.png')
+    plt.close()
+    w = (v_ @ jnp.diag(1/e_)).sum(axis=0)
+    plt.plot(w)
+    plt.savefig(f'../../thoughts/towards_gdln/figs/nlgp_gated_w_{xi1}_{xi2}_{gain}.png')
+    plt.close()
+    
+    # batch_size = 1000
+    # for i in range(0, len(dataset), batch_size):
+    #   x, y = dataset.__getitem__(slice(i, i+batch_size))
+    # print(profiler.print_stats())
     
     # from nets import samplers
     # sampler = samplers.EpochSampler(

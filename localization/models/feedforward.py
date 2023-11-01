@@ -86,6 +86,23 @@ def pruned_init(
   print("Loaded pruned weights for L={L}, K={K}.")
   return jnp.sqrt(scale) * weight
 
+def small_bump_init(
+  weight: Array,
+  key: Array,
+  scale: float = 1.0,
+):
+  K, L = weight.shape
+  assert K == 2 and L == 40
+  scale = jnp.sqrt(scale)
+  weight = jnp.zeros((K, L))
+  weight = weight.at[0, 2].set(1. * scale)
+  weight = weight.at[0, 3].set(2. * scale)
+  weight = weight.at[0, 4].set(1. * scale)
+  weight = weight.at[1, 2].set(-1. * scale)
+  weight = weight.at[1, 3].set(-2. * scale)
+  weight = weight.at[1, 4].set(-1. * scale)
+  return weight
+
 class StopGradient(eqx.Module):
   """Stop gradient wrapper."""
 
@@ -252,3 +269,61 @@ class SimpleNet(eqx.Module):
     x = jnp.mean(x)#, axis=0)#.reshape(-1)
 
     return x
+
+class GatedNet(eqx.Module):
+  """
+  2-layer MLP, but only one layer is learnable.
+  Rather than an activation, we apply a gating function.
+  """
+
+  fc1: eqx.Module
+  gate: Callable
+
+  def __init__(
+    self,
+    in_features: int,
+    hidden_features: int | None = None,
+    act: Callable = lambda x: 1.,
+    *,
+    key: Array = None,
+    init_scale: float = 1.0,
+    **linear_kwargs
+  ):
+    """Initialize an MLP.
+
+    Args:
+       in_features: The expected dimension of the input.
+       hidden_features: Dimensionality of the hidden layer.
+       out_features: The dimension of the output feature.
+       act: Gating function to be applied to the intermediate layer.
+            Given input x, returns a vector of gates for all the intermediate neurons.
+       drop: The probability associated with `Dropout`.
+       key: A `jax.random.PRNGKey` used to provide randomness for parameter
+        initialisation.
+       init_scale: The scale of the variance of the initial weights.
+    """
+    super().__init__()
+    # out_features = out_features or in_features
+    hidden_features = hidden_features or in_features
+
+    self.fc1 = Linear(
+      in_features=in_features,
+      out_features=hidden_features,
+      key=key,
+      init_scale=init_scale,
+      **linear_kwargs # TODO: try use_bias = False
+    ) 
+    self.gate = act
+
+    # TODO(leonl): Add an static layer with input dimension `hidden_features`.
+    del hidden_features
+
+
+  def __call__(self, x: Array, *, key: Array) -> Array:
+    """Apply the MLP block to the input."""
+    p = self.fc1(x)
+    g = self.gate(x)
+    p = g * p
+    y = jnp.mean(p)
+
+    return y

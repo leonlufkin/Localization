@@ -1,0 +1,1093 @@
+% GO TO: /Users/leonlufkin/Library/texmf/tex/latex
+%        to add custom packages to the path
+\documentclass{article}
+\usepackage{report}
+
+\title{Receptive Field Localization}
+\author{Leon Lufkin}
+\date{\today}
+
+\makeatletter
+\let\Title\@title
+\let\Author\@author
+\let\Date\@date
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%
+%% The Problem %%
+%%%%%%%%%%%%%%%%%
+\section{The Problem}
+We consider a feedforward neural network with a single hidden layer and activation function $\sigma$.
+It receives an input $x \in \R^n$ and produces a scalar output $\hat{y} \in \R$.
+The hidden layer has $K$ units.
+The weights for the first and second layer are $W_1 \in \R^{K \times n}$ and $W_2 \in \R^{1 \times K}$, respectively, and the corresponding biases are $b_1 \in \R^K$ and $b_2 \in \R$.
+\begin{align}
+  \hat{y} &= W_2 \sigma( W_1 x + b_1 ) + b_2. \label{eq:model}
+\end{align}
+
+Our data $x$ are sampled from a mixture of two translation-invariant distributions in some family $\{ p_\xi \}_{\xi}$ parameterized by a correlation length-scale $\xi$.
+That is, we sample $x \sim p_{\xi_1}$ with probability $\frac{1}{2}$ and $x \sim p_{\xi_2}$ otherwise.
+If $x$ is sampled from $p_{\xi_1}$, then $y(x) = 1$; otherwise, $y(x) = 0$. 
+We can train using either mean-squared error or cross-entropy loss, though we primarily consider the former. 
+
+Alessandro's paper primarily considers the case where $W_2 = \frac{1}{K} \mathbf{1}^\top$ (take the mean of the hidden activations) is fixed and $\sigma(h) = \text{erf}(\frac{h}{\sqrt{2}})$.
+I have also tried $\sigma = \text{sigmoid}, \text{ReLU}$.
+For the former, the results are qualitatively identical, while for the latter we get localization if $\xi_1 > \xi_2$ and short-range oscillations otherwise.
+For $\sigma = \text{ReLU}$, one can further remove the bias terms $b_1$ and $b_2$ (though not for sigmoid).
+% TODO: explain why
+
+We consider two types of datasets: the nonlinear Gaussian process (NLGP) and the single pulse (SP).
+We explain them in more detail later.
+They differ primarily in that the former has continuous support on $\R^n$, while the latter has discrete support on a subset of $\{ 0, 1 \}^n$.
+The former also has a gain parameter that controls the degree of localization, while the latter does not. 
+
+\emph{We'll present the results in reverse order, since it makes more sense logically.
+We start by attempting to analyze the ReLU model directly.
+This will force us to assume Gaussian data, which captures only half of what we'd like to describe.
+We will discuss some ideas about how to extend this to the non-Gaussian case, and perhaps also the SP dataset.}
+
+\emph{To address these analytical roadblocks, we'll explore using a gated deep linear network (GDLN) to model the ReLU network.
+This will require some assumptions about the gating structure, which we test empirically.
+However, we're not really sure how to properly set up the ``neural race'' and map the winner onto the ReLU case.
+We consider a few approaches, though we are not sure which is correct.
+We'll conclude with some questions, concerns, and ideas, with specific focus on the discrete Fourier transform, uncertainty principle, and characteristic functions.}
+
+
+%%%%%%%%%%%%%%%%%%%
+%% ReLU Analysis %%
+%%%%%%%%%%%%%%%%%%%
+\section{ReLU Analysis}
+To get an idea of what gating looks like early on during training, let's try to analyze the gradient flow for a ReLU network.
+We won't be able to solve it exactly, but we can get some intuition.
+We will have to assume the data are Gaussian to say something interesting after just a few steps.
+Of course, this is the case we are less interested in, since it's the non-Gaussian data that shows localization.
+
+Let $w_i$ be the $i$-th row in $W_1$.
+We make predictions with
+\begin{align}
+  \hat{y}(x) &= \frac{1}{K} \sum_{k \in [K]} \text{ReLU}(\langle w_k, x \rangle).
+\end{align}
+We use MSE loss,
+\begin{align}
+  \LL &= \frac{1}{2} \E_{X,Y} \left[ \left( \hat{y}(X) - Y \right)^2 \right].
+\end{align}
+The corresponding gradient flow for $w_1$ is given by
+\begin{align}
+  \tau \frac{d}{dt} w_1
+  &= -\E_{X,Y} \left[ \left( \frac{1}{K} \sum_{k \in [K]} \text{ReLU}(\langle w_k, X \rangle) - Y \right) \frac{\partial}{\partial w_1} \left[ \text{ReLU}(\langle w_1, X \rangle) \right] \right] \\
+  &= \frac{1}{2} \E_{X, \langle w_1, X \rangle > 0 \mid Y=1} \left[ X \right] - \frac{1}{K} \sum_{k \in [K]} \E_{X,Y, \langle w_1, X \rangle > 0, \langle w_k, X \rangle > 0} \left[ \langle w_k, X \rangle X \right]
+\end{align}
+
+%%%%%%%%%%%%%%%%%%%
+%% Gaussian Data %%
+\subsection*{Gaussian Data}
+To compute these conditional expectations, we will have to assume the data are Gaussian.
+% (Below, I try to do this without assuming Gaussian data, but I haven't been able to make any meaningful progress there yet.)
+We begin by computing the first conditional expectation.
+Define the random variable $S = \langle w_1, X \rangle$.
+\begin{align} \label{eq:yx_cond_exp}
+  \E_{X, S > 0 \mid Y=1} \left[ X \right]
+  &= \E_{S \mid S > 0, Y=1} \left[ \E_{X \mid S, Y=1} \left[ X \right] \right]
+  \PR\left( S > 0 \mid Y = 1 \right).
+\end{align}
+Let us consider $X$ sampled from $p_{\xi_1}$ (i.e. with label $Y=1$) and write
+\begin{align}
+  X &= AX + S v, \label{eq:X_rewrite}
+\end{align}
+where
+\begin{align}
+  v &= \frac{1}{ w_1^\top \Sigma_1 w_1 } \Sigma_1 w_1, \\
+  A &= I_n - v w_1^\top.
+\end{align}
+\Cref{eq:X_rewrite} clearly holds.
+Our specific selection of $v$ and $A$ guarantees that $A X$ and $S$ have zero covariance.
+\emph{Since $X$ is Gaussian, this implies they are independent.}
+So, $X \mid S \sim \NN\left( S v, A \Sigma A^\top \right)$.
+Note that $\E_{S \mid S>0, Y=1} \left[ S \right] = \left( \frac{2}{\pi} w_1^\top \Sigma_1 w_1 \right)^{\frac{1}{2}}$.
+Plugging this into \cref{eq:yx_cond_exp},
+\begin{align}
+  \E_{X, S \mid S > 0, Y=1} \left[ X \right]
+  &= \E_{S \mid S>0, Y=1} \left[ S v \right] \PR\left( S > 0 \mid Y = 1  \right) \\
+  % &= \frac{1}{2} \left( \frac{2}{\pi} w_1^\top \Sigma_1 w_1 \right)^{\frac{1}{2}} \frac{1}{ w_1^\top \Sigma_1 w_1 } \Sigma_1 w_1 \\
+  &= \frac{1}{\sqrt{2 \pi}} \left( w_1^\top \Sigma_1 w_1 \right)^{-\frac{1}{2}} \Sigma_1 w_1.
+\end{align}
+
+Now, let us evaluate the second conditional expectation.
+First, we consider the case $k=1$.
+Then, we only have one positivity constraint.
+We use $S$ again, just as before.
+Let us also only consider $X$ with label $Y=1$.
+\begin{align} \label{eq:xx_w1_cond_exp}
+  \E_{X, S \mid S > 0, Y=1} \left[ S X \right]
+  &= \E_{S \mid S > 0, Y=1} \left[ S \E_{X \mid S, Y=1} \left[ X \right] \right] \PR( S > 0 \mid Y = 1  )
+  = \frac{1}{2} \E_{S \mid S > 0, Y=1} \left[ S^2 \right] v.
+\end{align}
+By symmetry of $S$ about 0, $\E_{S \mid S > 0, Y=1} \left[ S^2 \right] = \E_{S \mid Y=1} \left[ S^2 \right] = w_1^\top \Sigma_1 w_1$.
+(This step does not require Gaussianity!)
+So,
+\begin{align}
+  \E_{X,\langle w_1, X \rangle > 0 \mid Y=1} \left[ \langle w_1, X \rangle X \right]
+  &= \frac{1}{2} w_1^\top \Sigma_1 w_1 \left( \frac{1}{ w_1^\top \Sigma_1 w_1 } \Sigma_1 w_1 \right)
+  = \frac{1}{2} \Sigma_1 w_1.
+\end{align}
+
+Now, let us consider $k>1$.
+We will need to consider both positivity constraints.
+To do this, let us define $S = \langle w_1, X \rangle$ (as above) and $T = \langle w_k, X \rangle$.
+Again, let us focus on $Y = 1$.
+\begin{align}
+  \E_{X, S > 0, T > 0 \mid Y=1} \left[ T X \right]
+  &= \E_{S > 0, T > 0 \mid Y=1} \left[ T \E_{X \mid S, T} \left[ X \right] \right] \PR\left( S>0, T>0 \mid Y=1 \right).
+\end{align}
+Define
+\begin{align}
+  U &= \begin{bmatrix} w_1^\top \\ w_k^\top \end{bmatrix}, \qquad \text{and} \qquad
+  b = \begin{bmatrix} S \\ T \end{bmatrix}.
+\end{align}
+Then, we can write the inner expectation as
+\begin{align}
+  \E_{X \mid U X = b} \left[ X \right].
+\end{align}
+Using a similar trick as above,
+\begin{align}
+  X &= AX + C b, \label{eq:X_rewrite_wk}
+\end{align}
+where
+\begin{align}
+  C &= \Sigma_1 U^\top ( U^\top \Sigma_1 U )^{-1}, \\
+  A &= I_n - C U.
+\end{align}
+Again, our specific selection of $C$ and $A$ guarantees that $A X$ and $C b$ have zero covariance.
+Since $X$ is Gaussian, this means we can write $\E_{X \mid U X = b} \left[ X \right] = C b$.
+So,
+\begin{align}
+  \E_{X, S > 0, T > 0 \mid Y=1} \left[ T X \right]
+  &= C \E_{S > 0, T > 0 \mid Y=1} \left[ \begin{bmatrix} S^2 \\ ST \end{bmatrix} \right] \PR\left( S>0, T>0 \mid Y=1 \right).
+\end{align}
+
+We begin with the first term.
+Let us define $\rho_{ij} = w_i^\top \Sigma w_j^\top$ for $i,j = 1,k$.
+% FIXME: when is this integral not defined?
+\begin{align}
+  &\E_{S > 0, T > 0 \mid Y=1} \left[ S^2 \right] \\
+  &= \int_0^\infty \int_0^\infty s^2 \frac{1}{2\pi \sqrt{\rho_{11} \rho_{kk} - \rho_{1k}^2}} e^{-\frac{1}{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2)}( \rho_{11} s^2 - 2 \rho_{1k} st + \rho_{kk} t^2 )} dt ds \\
+  &= \int_0^\infty s^2 \frac{1}{\sqrt{2\pi} \sqrt{\rho_{kk}}} e^{ -\frac{1}{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2) } \left( - \frac{\rho_{1k}^2}{\rho_{kk}} s^2 + \rho_{11} s^2 \right) } \int_0^\infty \frac{1}{\sqrt{2\pi} \left( \sqrt{ \frac{ \rho_{11} \rho_{kk} - \rho_{1k}^2 }{ \rho_{kk} } } \right)} e^{-\frac{1}{2 \left( \frac{ \rho_{11} \rho_{kk} - \rho_{1k}^2 }{ \rho_{kk} } \right)} \left( t - \frac{\rho_{1k}}{\rho_{kk}} s \right)^2 } dt ds \\ % ( \rho_{11} s^2 - 2 \rho_{1k} st + \rho_{kk} t^2 ) = \rho_{kk} ( t - \frac{\rho_{1k}}{\rho_{kk}} s )^2 - \frac{\rho_{1k}^2}{\rho_{kk}} s^2 + \rho_{11} s^2
+  &= \int_0^\infty s^2 \frac{1}{\sqrt{2\pi} \sqrt{\rho_{kk}}} e^{ -\frac{1}{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2) } \left( - \frac{\rho_{1k}^2}{\rho_{kk}} s^2 + \rho_{11} s^2 \right) } \frac{1}{2}\left(1+\operatorname{erf}\left(\frac{\rho_{1k}}{\sqrt{2\rho_{kk}\left(\rho_{11}\rho_{kk}-\rho_{1k}^{2}\right)}}s\right)\right) ds \\
+  % &= \frac{1}{2}\frac{\rho_{kk}}{2} + \frac{\rho_{kk}}{4}-\frac{\rho_{kk}}{2\pi}\left(\cos^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\sqrt{1-\frac{\rho_{1k}^{2}}{\rho_{11}\rho_{kk}}}\right)
+  &= \frac{\rho_{kk}}{2\pi}\left(\cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)+\frac{\rho_{1k}}{\rho_{11}\rho_{kk}}\sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}}\right).
+\end{align}
+% FIXME: is there some way to simplify this further?
+% Writing this in terms of $\theta_{ij} = w_i^\top \Sigma w_j$, we have
+% \begin{align}
+%   \E_{S > 0, T > 0 \mid Y=1} \left[ S^2 \right]
+%   &= (\rho_{11} \rho_{kk} - \rho_{1k}^2) \frac{\rho_{kk}}{2\pi}\left(\cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)+\frac{\rho_{1k}}{\rho_{11}\rho_{kk}}\sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}}\right) \\
+%   &= \frac{1}{(\theta_{11} \theta_{kk} - \theta_{1k}^2)} \frac{\frac{\theta_{11}}{(\theta_{11} \theta_{kk} - \theta_{1k}^2)}}{2\pi}\left(\cos^{-1}\left(\frac{\theta_{1k}}{\sqrt{\theta_{11}\theta_{kk}}}\right)-\frac{\theta_{1k}}{\theta_{11}\theta_{kk}} \cdot \frac{1}{\theta_{11} \theta_{kk} - \theta_{1k}^2} \sqrt{\theta_{11}\theta_{kk}-\theta_{1k}^{2}}\right) \\
+%   &= \frac{\theta_{11}}{2\pi (\theta_{11} \theta_{kk} - \theta_{1k}^2)^2} \left(\cos^{-1}\left(\frac{\theta_{1k}}{\sqrt{\theta_{11}\theta_{kk}}}\right)-\frac{\theta_{1k}}{\theta_{11}\theta_{kk} \sqrt{\theta_{11}\theta_{kk}-\theta_{1k}^{2}} } \right) \\
+%   &= \frac{\theta_{11}}{2\pi (\theta_{11} \theta_{kk} - \theta_{1k}^2)^2} \cos^{-1}\left(\frac{\theta_{1k}}{\sqrt{\theta_{11}\theta_{kk}}}\right) - \frac{1}{2\pi (\theta_{11} \theta_{kk} - \theta_{1k}^2)^2} \frac{1}{\sqrt{\theta_{11}\theta_{kk}-\theta_{1k}^{2}} }
+% \end{align}
+
+Now, the second term:
+\begin{align}
+  &\E_{S > 0, T > 0 \mid Y=1} \left[ S T \right] \\
+  &= \int_0^\infty \int_0^\infty s t \frac{1}{2\pi \sqrt{\rho_{11} \rho_{kk} - \rho_{1k}^2}} e^{-\frac{1}{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2)}( \rho_{11} s^2 - 2 \rho_{1k} st + \rho_{kk} t^2 )} dt ds \\
+  &= \int_0^\infty s \frac{1}{\sqrt{2\pi} \sqrt{\rho_{kk}}} e^{ -\frac{1}{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2) } \left( - \frac{\rho_{1k}^2}{\rho_{kk}} s^2 + \rho_{11} s^2 \right) } \underbrace{ \int_0^\infty t \frac{1}{\sqrt{2\pi} \left( \sqrt{ \frac{ \rho_{11} \rho_{kk} - \rho_{1k}^2 }{ \rho_{kk} } } \right)} e^{-\frac{1}{2 \left( \frac{ \rho_{11} \rho_{kk} - \rho_{1k}^2 }{ \rho_{kk} } \right)} \left( t - \frac{\rho_{1k}}{\rho_{kk}} s \right)^2 } dt }_\text{mean of truncated normal with $\mu = \frac{\rho_{1k}}{\rho_{kk}} s$, $\sigma^2 = \frac{\rho_{11} \rho_{kk} - \rho_{1k}^2}{\rho_{kk}}$, $a = 0, b = \infty$} ds \\
+  & \begin{multlined} =\int_0^\infty s \frac{1}{\sqrt{2\pi} \sqrt{\rho_{kk}}} e^{ -\frac{1}{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2) } \left( - \frac{\rho_{1k}^2}{\rho_{kk}} s^2 + \rho_{11} s^2 \right) } \\
+    \left[ \frac{1}{2}\left(\frac{\rho_{1k}}{\rho_{kk}}s\right)\left(1+\operatorname{erf}\left(\frac{\frac{\rho_{1k}}{\rho_{kk}}s}{\sqrt{2\frac{\rho_{11}\rho_{kk}-\rho_{1k}^{2}}{\rho_{kk}}}}\right)\right)+\frac{1}{\sqrt{2\pi}}e^{-\frac{1}{2}\frac{\left(\frac{\rho_{1k}}{\rho_{kk}}s\right)^{2}}{\frac{\rho_{11}\rho_{kk}-\rho_{1k}^{2}}{\rho_{kk}}}}\left(\sqrt{\frac{\rho_{11}\rho_{kk}-\rho_{1k}^{2}}{\rho_{kk}}}\right) \right]  ds \end{multlined} \\
+  &= \frac{\rho_{1k}}{2\pi}\left(\sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)+\frac{\rho_{1k}}{\rho_{11}\rho_{kk}}\sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}}\right).
+\end{align}
+Thus,
+\begin{align}
+  & C \E_{X, S > 0, T > 0 \mid Y=1} \left[ T X \right] \\
+  &= C \begin{bmatrix}
+    \frac{\rho_{kk}}{2\pi}\left(\cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)+\frac{\rho_{1k}}{\rho_{11}\rho_{kk}}\sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}}\right) \\
+    \frac{\rho_{1k}}{2\pi}\left(\sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)+\frac{\rho_{1k}}{\rho_{11}\rho_{kk}}\sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}}\right)
+  \end{bmatrix} \\
+  &= \frac{1}{2\pi} C \begin{bmatrix}
+    \rho_{kk} \cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) \\
+    \rho_{1k} \sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)
+  \end{bmatrix}
+  + \frac{1}{2\pi} \cdot \frac{\rho_{1k}}{\rho_{11}\rho_{kk}} \cdot \sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}}
+  C \begin{bmatrix}
+    1 \\ 1
+  \end{bmatrix}. %\\
+  % &= \frac{1}{2\pi} \Sigma_1 U^\top ( U^\top \Sigma_1 U )^{-1} \begin{bmatrix}
+  %   \rho_{kk} \cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) \\
+  %   \rho_{1k} \sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)
+  % \end{bmatrix}
+\end{align}
+
+Let's compute $C$
+\begin{align}
+  \Sigma_1 U^\top ( U^\top \Sigma_1 U )^{-1}
+  &= \frac{ 1 }{ \rho_{11} \rho_{kk} - \rho_{1k}^2 } 
+  \begin{bmatrix} \Sigma_1  w_1 & \Sigma_1 w_k \end{bmatrix}
+  \begin{bmatrix} \rho_{kk} & -\rho_{1k} \\ -\rho_{1k} & \rho_{11} \end{bmatrix}.
+\end{align}
+Then,
+\begin{align}
+  &C \begin{bmatrix}
+    \rho_{kk} \cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) \\
+    \rho_{1k} \sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)
+  \end{bmatrix} \\
+  &= \frac{ 1 }{ \rho_{11} \rho_{kk} - \rho_{1k}^2 } 
+  \begin{bmatrix} \Sigma_1  w_1 & \Sigma_1 w_k \end{bmatrix}
+  \begin{bmatrix} \rho_{kk} & -\rho_{1k} \\ -\rho_{1k} & \rho_{11} \end{bmatrix}
+  \begin{bmatrix}
+    \rho_{kk} \cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) \\
+    \rho_{1k} \sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)
+  \end{bmatrix} \\
+  &= \frac{ 1 }{ \rho_{11} \rho_{kk} - \rho_{1k}^2 } 
+  \begin{bmatrix} \Sigma_1  w_1 & \Sigma_1 w_k \end{bmatrix}
+  \begin{bmatrix}
+    \rho_{kk}^2 \cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) - \rho_{1k}^2 \sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) \\
+    -\rho_{1k} \rho_{kk} \cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) + \rho_{1k} \rho_{11} \sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right)
+  \end{bmatrix} \\
+  &\begin{multlined} = \frac{ 1 }{ \rho_{11} \rho_{kk} - \rho_{1k}^2 } 
+  \left[ \left( \rho_{kk}^2 \cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) - \rho_{1k}^2 \sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) \right) \Sigma_1 w_1 \right. \\
+  \left. + \left( -\rho_{1k} \rho_{kk} \cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) + \rho_{1k} \rho_{11} \sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) \right) \Sigma_1 w_k \right]
+  \end{multlined}.
+\end{align}
+And,
+\begin{align}
+  % \begin{multlined} 
+  \frac{\rho_{1k}}{\rho_{11}\rho_{kk}} \cdot \sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}}
+  C \begin{bmatrix}
+    1 \\ 1
+  \end{bmatrix}% \\
+  &=
+  \frac{\rho_{1k}}{\rho_{11}\rho_{kk}}
+  \cdot \frac{ 1 }{ \sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}} } 
+  \begin{bmatrix} \Sigma_1  w_1 & \Sigma_1 w_k \end{bmatrix}
+  \begin{bmatrix} \rho_{kk} -\rho_{1k} \\ \rho_{11}-\rho_{1k} \end{bmatrix} \\
+  % \end{multlined} 
+  &= \frac{\rho_{1k}}{\rho_{11}\rho_{kk}}
+  \cdot \frac{ 1 }{ \sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}} } 
+  \left( (\rho_{kk} -\rho_{1k}) \Sigma_1 w_1 + (\rho_{11}-\rho_{1k}) \Sigma_1 w_k \right).% \\
+  % &= \frac{\rho_{1k}}{\rho_{11}\rho_{kk}}
+  % \cdot \frac{ 1 }{ \sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}} } 
+  % ( w_1 w_k^\top - w_k w_1^\top ) \Sigma_1 ( w_k - w_1 )
+\end{align}
+In toto,
+\begin{align}
+  &\E_{X, \langle w_1, X \rangle > 0, \langle w_k, X \rangle > 0 \mid Y=1} \left[ \langle w_k, X \rangle X \right] \\
+  &= C \E_{X, S > 0, T > 0 \mid Y=1} \left[ T X \right] \\
+  &\begin{multlined}
+    = \frac{1}{2\pi} \cdot \frac{ 1 }{ \rho_{11} \rho_{kk} - \rho_{1k}^2 } 
+    \left[ \left( \rho_{kk}^2 \cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) - \rho_{1k}^2 \sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) \right) \Sigma_1 w_1 \right. \\
+    \left. + \left( -\rho_{1k} \rho_{kk} \cos^{-1}\left(-\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) + \rho_{1k} \rho_{11} \sin^{-1}\left(\frac{\rho_{1k}}{\sqrt{\rho_{11}\rho_{kk}}}\right) \right) \Sigma_1 w_k \right] \\
+    + \frac{1}{2\pi} \cdot \frac{\rho_{1k}}{\rho_{11}\rho_{kk}}
+    \cdot \frac{ 1 }{ \sqrt{\rho_{11}\rho_{kk}-\rho_{1k}^{2}} } 
+    \left( (\rho_{kk} -\rho_{1k}) \Sigma_1 w_1 + (\rho_{11}-\rho_{1k}) \Sigma_1 w_k \right).
+    \end{multlined} \label{eq:xx_wk_cond_exp}
+\end{align}
+This is really messy!
+But, we can identify an important order parameter: $\gamma \equiv \frac{\rho_{1k}}{\sqrt{ \rho_{11} \rho_{kk} }}$.
+This measures the cosine similarity between $w_1$ and $w_k$ with respect to the inner product defined by $\Sigma_1$.
+(Does the cosine identity still hold under this new inner product?)
+\begin{align}
+  &\begin{multlined}
+    \eqref{eq:xx_wk_cond_exp} 
+    = \frac{1}{2\pi (1 - \gamma^2) \rho_{11} \rho_{kk} }
+    \left[ \left( \rho_{kk}^2 \cos^{-1}(-\gamma) - \rho_{1k}^2 \sin^{-1}(\gamma) \right) \Sigma_1 w_1 + \left( -\rho_{1k} \rho_{kk} \cos^{-1}(\gamma) + \rho_{1k} \rho_{11} \sin^{-1}(\gamma) \right) \Sigma_1 w_k \right] \\
+    + \frac{ 1 }{ 2\pi \sqrt{1-\gamma^2} } \cdot \frac{\rho_{1k}}{ \sqrt{ \rho_{11}\rho_{kk} }^{3} }
+    \left( (\rho_{kk} -\rho_{1k}) \Sigma_1 w_1 + (\rho_{11}-\rho_{1k}) \Sigma_1 w_k \right)
+  \end{multlined} \\
+  &\begin{multlined}
+    = \frac{1}{2\pi (1 - \gamma^2) }
+    \left[ \left( \frac{ \rho_{kk} }{ \rho_{11} } \cos^{-1}(-\gamma) - \gamma^2 \sin^{-1}(\gamma) \right) \Sigma_1 w_1 + \left( -\frac{\rho_{1k}}{\rho_{11}} \cos^{-1}(\gamma) + \frac{\rho_{1k}}{\rho_{kk}} \sin^{-1}(\gamma) \right) \Sigma_1 w_k \right] \\
+    + \frac{ 1 }{ 2\pi \gamma \sqrt{1-\gamma^2} \rho_{11}\rho_{kk} }
+    \left( (\rho_{kk} -\rho_{1k}) \Sigma_1 w_1 + (\rho_{11}-\rho_{1k}) \Sigma_1 w_k \right)
+  \end{multlined} \\
+  &\begin{multlined} = \left[ \frac{1}{2\pi (1 - \gamma^2) } \left( \frac{ \rho_{kk} }{ \rho_{11} } \cos^{-1}(-\gamma) - \gamma^2 \sin^{-1}(\gamma) \right) 
+  + \frac{ \rho_{kk} -\rho_{1k} }{ 2\pi \gamma \sqrt{1-\gamma^2} \rho_{11}\rho_{kk} }
+   \right] \Sigma_1 w_1  \\
+  + \left[ \frac{1}{2\pi (1 - \gamma^2) } \left( -\frac{\rho_{1k}}{\rho_{11}} \cos^{-1}(\gamma) + \frac{\rho_{1k}}{\rho_{kk}} \sin^{-1}(\gamma) \right)
+  + \frac{ \rho_{11} -\rho_{1k} }{ 2\pi \gamma \sqrt{1-\gamma^2} \rho_{11}\rho_{kk} }
+  \right] \Sigma_1 w_k
+  \end{multlined} \\
+  % &\begin{multlined} = \left[ \frac{1}{2\pi (1 - \gamma^2) } \left( \frac{ \rho_{kk} }{ \rho_{11} } \cos^{-1}(-\gamma) - \gamma^2 \sin^{-1}(\gamma) \right) 
+  %   + \frac{ 1 }{ 2\pi \gamma \sqrt{1-\gamma^2} \rho_{11} }
+  %   - \frac{ \gamma }{ 2\pi \gamma \sqrt{1-\gamma^2} \sqrt{ \rho_{11}\rho_{kk} } }
+  %    \right] \Sigma_1 w_1  \\
+  %   + \left[ \frac{\rho_{1k}}{2\pi (1 - \gamma^2) } \left( -\frac{1}{\rho_{11}} \cos^{-1}(\gamma) + \frac{1}{\rho_{kk}} \sin^{-1}(\gamma) \right)
+  %   + \frac{ 1 }{ 2\pi \gamma \sqrt{1-\gamma^2} \rho_{kk} }
+  %   - \frac{ \gamma }{ 2\pi \gamma \sqrt{1-\gamma^2} \sqrt{ \rho_{11}\rho_{kk} } }
+  %   \right] \Sigma_1 w_k
+  % \end{multlined} \\
+  &\begin{multlined} = \left[ \frac{1}{2\pi (1 - \gamma^2) } \left( \frac{ \rho_{kk} }{ \rho_{11} } \cos^{-1}(-\gamma) - \gamma^2 \sin^{-1}(\gamma) \right) 
+    + \frac{ \frac{1}{\gamma \rho_{11}} - \frac{1}{\sqrt{ \rho_{11}\rho_{kk} }} }{ 2\pi \sqrt{1-\gamma^2} }
+     \right] \Sigma_1 w_1  \\
+    + \left[ -\frac{ \gamma }{2\pi (1 - \gamma^2) } \sqrt{\frac{\rho_{11}}{\rho_{kk}}} \left( \frac{\rho_{kk}}{\rho_{11}} \cos^{-1}(\gamma) - \sin^{-1}(\gamma) \right)
+    + \frac{ \frac{1}{ \gamma \rho_{kk} } - \frac{1}{ \sqrt{ \rho_{11}\rho_{kk} }  }  }{ 2\pi \sqrt{1-\gamma^2} }
+    \right] \Sigma_1 w_k
+  \end{multlined} \\
+  &\begin{multlined} = \left[ \frac{\gamma^{2}-\frac{\rho_{kk}}{\rho_{11}}}{2\pi(1-\gamma^{2})}\cos^{-1}\left(\gamma\right)+\frac{2\frac{\rho_{kk}}{\rho_{11}}-\gamma^{2}}{4(1-\gamma^{2})}+\frac{\frac{1}{\gamma\rho_{11}}-\frac{1}{\sqrt{\rho_{11}\rho_{kk}}}}{2\pi\sqrt{1-\gamma^{2}}} \right] \Sigma_1 w_1  \\
+    + \left[ ?? \right] \Sigma_1 w_k
+  \end{multlined}
+\end{align}
+
+
+\newpage
+Hi!
+\newpage
+Forgot to consider $\Sigma_0$ in gradient flow.
+Look for order parameters, I think it will be more meaningful.
+\subsubsection*{Interpretation}
+This is really messy!
+How do we interpret what this is telling us?
+Let's consider two extreme cases, first where $\rho_{1k} = 0$, that is, $w_1$ and $w_k$ are orthogonal w.r.t. to the inner product defined by $\Sigma_1$.
+Then, we'll consider the case where they are almost identical.
+
+\paragraph{Orthogonal $w_1$ and $w_k$}
+We simplify \cref{eq:xx_wk_cond_exp},
+\begin{align}
+  \E_{X, \langle w_1, X \rangle > 0, \langle w_k, X \rangle > 0 \mid Y=1} \left[ \langle w_k, X \rangle X \right]
+  &= \frac{1}{2\pi} \cdot \frac{ 1 }{ \rho_{11} \rho_{kk} } \left[ \left( \rho_{kk}^2 \frac{\pi}{2} \right) \Sigma_1 w_1 \right]
+  = \frac{ \rho_{kk} }{ 4 \rho_{11} } \Sigma_1 w_1.
+\end{align}
+So, the gradient flow is
+\begin{align}
+  \tau \frac{d}{dt} w_1
+  &= -\E_{X,Y} \left[ \left( \frac{1}{K} \sum_{k \in [K]} \text{ReLU}(\langle w_k, X \rangle) - Y \right) \frac{\partial}{\partial w_1} \left[ \text{ReLU}(\langle w_1, X \rangle) \right] \right] \\
+  &= \frac{1}{2 \sqrt{2 \pi}} \left( w_1^\top \Sigma_1 w_1 \right)^{-\frac{1}{2}} \Sigma_1 w_1 - \frac{1}{2 K} \left( \Sigma_1 w_1 + \sum_{k > 1} \frac{ \rho_{kk} }{ 2 \rho_{11} } \Sigma_1 w_1 \right) \\
+  &= \frac{1}{2} \left[ \frac{1}{\sqrt{2 \pi}} \left( w_1^\top \Sigma_1 w_1 \right)^{-\frac{1}{2}} - \frac{1}{K} \left( 1 + \sum_{k > 1} \frac{ w_k^\top \Sigma_1 w_k }{ 2 w_1^\top \Sigma_1 w_1 } \right) \right] \Sigma_1 w_1.
+\end{align}
+So, the update to $w_1$ only depends on $w_k$ through its weighted norm.
+There is no additional ``competition term'' that persists, although of course we've assumed that $w_1$ and $w_k$ are orthogonal.
+
+\paragraph{Almost identical $w_1$ and $w_k$}
+Now, let's consider the case where $\rho_{1k} = \sqrt{\rho_{11} \rho_{kk}} + \eps^2$.
+Then, we have
+\begin{align}
+  &\E_{X, \langle w_1, X \rangle > 0, \langle w_k, X \rangle > 0 \mid Y=1} \left[ \langle w_k, X \rangle X \right] \\
+  &\begin{multlined}
+    \approx \frac{\rho_{kk}^2}{2\pi} \cdot \frac{ 1 }{ \eps^2 } 
+    \left[ \left( \cos^{-1}\left(-1\right) - \sin^{-1}\left(1\right) \right) \Sigma_1 w_1 + \rho_{kk}^2 \left( - \cos^{-1}\left(-1\right) + \sin^{-1}\left(1\right) \right) \Sigma_1 w_k \right] \\
+    + \frac{1}{2\pi}
+    \cdot \frac{ 1 }{ \eps } 
+    \left( (\rho_{kk} - \rho_{1k}) \Sigma_1 w_1 + (\rho_{11}-\rho_{1k}) \Sigma_1 w_k \right).
+    \end{multlined}
+\end{align}
+
+
+\newpage
+Hi!
+\newpage
+\begin{align}
+  &\E_{S > 0, T > 0 \mid Y=1} \left[ S^2 \right] \\
+  &= \int_0^\infty \int_0^\infty s^2 \frac{1}{2\pi \sqrt{\rho_{11} \rho_{kk} - \rho_{1k}^2}} e^{-\frac{1}{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2)}( \rho_{11} s^2 - 2 \rho_{1k} st + \rho_{kk} t^2 )} ds dt \\
+  &= \int_0^\infty \frac{1}{\sqrt{2\pi}} \int_0^\infty s^2 \frac{1}{\sqrt{2\pi} \cdot \sqrt{\rho_{11} \rho_{kk} - \rho_{1k}^2}} e^{-\frac{1}{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2)}[ ( \rho_{11} s - \rho_{1k} t )^2 - \rho_{1k}^2 t^2 + \rho_{kk} t^2 ]} ds dt \\
+  &= \int_0^\infty \frac{1}{\sqrt{2\pi} \rho_{11}} e^{-\frac{(\rho_{kk} - \rho_{1k}^2) }{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2)} t^2 } \underbrace{ \int_0^\infty s^2 \frac{\rho_{11}}{\sqrt{2\pi} \cdot \sqrt{\rho_{11} \rho_{kk} - \rho_{1k}^2}} e^{-\frac{\rho_{11}^2}{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2)} ( s - \frac{\rho_{1k}}{\rho_{11}} t )^2 } ds }%_{\text{$=$ second moment of folded $\NN(\frac{\rho_{1k}}{\rho_{11}} t, \frac{\rho_{11} \rho_{kk} - \rho_{1k}^2}{\rho_{11}^2})$}} dt \\
+  % &= \int_0^\infty \frac{1}{\sqrt{2\pi} \rho_{11}} e^{-\frac{(\rho_{kk} - \rho_{1k}^2) }{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2)} t^2 } \left( \frac{\rho_{1k}^2}{\rho_{11}^2} t^2 + \frac{\rho_{11} \rho_{kk} - \rho_{1k}^2}{\rho_{11}^2} \right) dt \\
+  % &= \frac{\sqrt{\frac{(\rho_{kk} - \rho_{1k}^2) }{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2)}}}{\rho_{11}} \int_0^\infty \frac{1}{\sqrt{2\pi} \cdot \sqrt{ \frac{(\rho_{kk} - \rho_{1k}^2) }{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2)} }} e^{-\frac{(\rho_{kk} - \rho_{1k}^2) }{2 (\rho_{11} \rho_{kk} - \rho_{1k}^2)} t^2 } \left( \frac{\rho_{1k}^2}{\rho_{11}^2} t^2 + \frac{\rho_{11} \rho_{kk} - \rho_{1k}^2}{\rho_{11}^2} \right) dt \\
+\end{align}
+
+
+To compute this expectation, we need to find the distribution of $(S, T)$.
+Let us write $\rho_{ij} = w_i^\top \Sigma_1 w_j$ and $\rho = \frac{ \rho_{1k} }{ \sqrt{ \rho_{11} \rho_{kk} } }$.
+Then,
+% \begin{align}
+%   \begin{bmatrix} S \\ T \end{bmatrix} \mid Y = 1
+%   &= \begin{bmatrix} w_1^\top \\ w_k^\top \end{bmatrix} X \mid Y = 1
+%   \sim \NN\left( 0, \begin{bmatrix} \rho_{11} & \rho_{1k} \\ \rho_{1k} & \rho_{kk} \end{bmatrix} \right).
+% \end{align}
+\begin{align}
+  \begin{bmatrix} S' \\ T' \end{bmatrix}
+  &\equiv \begin{bmatrix} S / \sqrt{\rho_{11}} \\ T / \sqrt{\rho_{kk}} \end{bmatrix} \mid Y = 1
+  = \begin{bmatrix} w_1^\top / \sqrt{\rho_{11}} \\ w_k^\top / \sqrt{\rho_{kk}} \end{bmatrix} X \mid Y = 1
+  % \sim \NN\left( 0, \begin{bmatrix} 1 & \frac{ \rho_{1k} }{ \sqrt{ \rho_{11} \rho_{kk} } } \\ \frac{ \rho_{1k} }{ \sqrt{ \rho_{11} \rho_{kk} } } & 1 \end{bmatrix} \right).
+  \sim \NN\left( 0, \begin{bmatrix} 1 & \rho \\ \rho & 1 \end{bmatrix} \right).
+\end{align}
+% Let us write $\rho = \frac{ \rho_{1k} }{ \sqrt{ \rho_{11} \rho_{kk} } }$ for brevity.
+Note that 
+\begin{align}
+  \E_{S>0,T>0 \mid Y=1}\left[ (S')^2 \right]
+  &= \E_{S'>0,T'>0 \mid Y=1}\left[ (S')^2 \right] \\
+  &= \E_{T'>0 \mid Y=1}\left[ \E_{S'>0 \mid T', Y=1} \left[ (S')^2 \right] \PR( S' > 0 \mid T', Y = 1 ) \right].
+\end{align}
+Note that
+\begin{align}
+  S' \mid T' \sim \NN\left( \rho T', 1 - \rho^2 \right).
+\end{align}
+Then, the inner expectation is the second moment of a folded normal.
+So, we can use Wikipedia:
+\begin{align}
+  \E_{S'>0 \mid T', Y=1} \left[ (S')^2 \right]
+  &= (\rho T')^2 + (1 - \rho^2)
+  = 1 + [ (T')^2 - 1 ] \rho^2.
+\end{align}
+The probability is
+\begin{align}
+  \PR( S' > 0 \mid T', Y = 1 )
+  &= \int_0^\infty \frac{1}{\sqrt{2 \pi (1 - \rho^2)}} e^{ -\frac{1}{2} \left( \frac{S' - \rho T'}{\sqrt{1 - \rho^2}} \right)^2 } dS' \\
+  &= \frac{1}{2} \left( 1 + \text{erf} \left( \frac{\rho T'}{\sqrt{2(1 - \rho^2)}} \right) \right).
+\end{align}
+So, we have
+\begin{align}
+  &\E_{S>0,T>0 \mid Y=1}\left[ (S')^2 \right] \\
+  &= \frac{1}{2} \E_{T'>0 \mid Y=1}\left[ \left( 1 + [ (T')^2 - 1 ] \rho^2 \right) \left( 1 + \text{erf} \left( \frac{\rho T'}{\sqrt{2(1 - \rho^2)}} \right) \right) \right] \\
+  &= \frac{1}{2} \E_{T'>0 \mid Y=1}\left[ \left( 1 + [ (T')^2 - 1 ] \rho^2 \right) + (1 - \rho^2) \text{erf} \left( \frac{\rho T'}{\sqrt{2(1 - \rho^2)}} \right) + \rho^2 (T')^2 \text{erf} \left( \frac{\rho T'}{\sqrt{2(1 - \rho^2)}} \right) \right].
+\end{align}
+We evaluate each of these terms separately.
+The first can be found using (half) the second moment of a folded normal:
+\begin{align}
+  \E_{T'>0 \mid Y=1}\left[ 1 + [ (T')^2 - 1 ] \rho^2 \right]
+  &= 1 + \rho^2 \left( \E_{T'>0 \mid Y=1}\left[ (T')^2 \right] - 1 \right)
+  = 1 + \rho^2 \left( \frac{1}{2} (1) - 1 \right) \\
+  &= 1 - \frac{\rho^2}{2}.
+\end{align}
+The second is
+\begin{align}
+  (1 - \rho^2) \E_{T'>0 \mid Y=1}\left[ \text{erf} \left( \frac{\rho T'}{\sqrt{2(1 - \rho^2)}} \right) \right]
+  &= (1 - \rho^2) \int_0^\infty \frac{1}{\sqrt{2 \pi}} e^{ -\frac{1}{2} (T')^2 } \text{erf} \left( \frac{\rho T'}{\sqrt{2(1 - \rho^2)}} \right) dT' \\
+  &= \frac{ 1 - \rho^2 }{ 2 } \left( 1 - \frac{2}{\pi} \tan^{-1} \left( \frac{\sqrt{1 - \rho^2}}{\rho} \right) \right).
+\end{align}
+The third is
+\begin{align}
+  \rho^2 \E_{T'>0 \mid Y=1}\left[ (T')^2 \text{erf} \left( \frac{\rho T'}{\sqrt{2(1 - \rho^2)}} \right) \right]
+  &= \rho^2 \int_0^\infty \frac{1}{\sqrt{2 \pi}} e^{ -\frac{1}{2} (T')^2 } (T')^2 \text{erf} \left( \frac{\rho T'}{\sqrt{2(1 - \rho^2)}} \right) dT' \\
+  &= \frac{\rho^2}{\sqrt{2 \pi} \cdot 2 \sqrt{\pi}} \left( 2^{\frac{3}{2}} \tan^{-1} \left( \frac{\sqrt{1-\rho^2}}{\rho}  \right) - \frac{ \rho / \sqrt{2(1-\rho^2)} }{ \frac{1}{2} ( \frac{\rho^2}{\frac{1}{2}(1-\rho^2)} + \frac{1}{2} ) } \right) \\
+  &= \frac{\rho^2}{2 \sqrt{2} \pi} \left( 2^{\frac{3}{2}} \tan^{-1} \left( \frac{\sqrt{1-\rho^2}}{\rho}  \right) - \frac{2\sqrt{2}\rho \sqrt{1-\rho^{2}}}{3\rho^{2}+1} \right).
+\end{align}
+
+
+The mean is (?):
+\begin{align}
+  \E_{S'>0 \mid T', Y=1} \left[ S' \right]
+  % &= \sqrt{(1-\rho^2)} \cdot \sqrt{\frac{2}{\pi}} e^{ -\frac{\rho^2 (T')^2}{2 \sqrt{(1-\rho^2)}} } - \rho T' \text{erf} \left( - \frac{\rho T'}{\sqrt{2} \cdot \sqrt{1 - \rho^2}} \right) \\
+  &= \sqrt{\frac{2}{\pi} (1-\rho^2)} \cdot e^{ -\frac{\rho^2 (T')^2}{2 \sqrt{(1-\rho^2)}} } + \rho T' \text{erf} \left( \frac{\rho T'}{\sqrt{2(1 - \rho^2)}} \right).
+\end{align}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%% Non-Gaussian Data %%
+\subsection*{Non-Gaussian Data}
+We needed Gaussianity to say that $A X$ and $S$ were independent.
+Our construction of $v$ and $A$ was chosen to make $A X$ and $S$ have zero covariance.
+For general data, this does not imply independence.
+So, we will have to do something else to compute the conditional expectations.
+
+What do we know about $X$?
+First, it is symmetric about 0, and it is translation invariant.
+As $g \to \infty$, $X_i(Z) \overset{d}{\to} \text{sign}(Z_i)$ (perhaps even almost surely, and even if not in distribution, then certainly in probability).
+I cannot figure out how to compute this for anything larger than 2 dimensions, though I feel it should be possible.
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Have You Tried Making It Linear? %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Have You Tried Making It Linear?}
+
+Gating lets us decompose the ReLU post-activation in terms of the pre-activation's sign and magnitude.
+\begin{align}
+  \text{ReLU}(\langle w_1(t), x \rangle)
+  &= g(t, x) \langle w_1(t), x \rangle \qquad \text{where} \qquad g(t, x) = \mathbbm{1}( \langle w_1(t), x \rangle \geq 0 ). \label{eq:relu_gating}
+\end{align}
+We generally assume that $g$ does not vary during learning, even though $w_1$ may.
+Later on, we'll try to analyze what happens when this does not hold.
+
+To assess the validity of this assumption, we need to see how much $g(x)$, as defined above, changes during learning.
+Additionally, post-hoc, we can usually pick a somewhat sensible gating structure that mimics a specific run's behavior.
+But we'd like to be able to determine this gating upfront.
+We explore all this in the following subsections.
+
+\subsection{Sign Flipping}
+
+Note that $g$ is invariant to the scale of $w_1$.
+We've observed in previous experiments that $w_1$ appears to grow uniformly in size during much of its training.
+(There is, importantly, a phase where it goes from Gaussian to non-Gaussian, but the localization seems to be more likely to occur around its mode.)
+This suggests that $g(x)$ may be relatively constant during learning.
+If this is so, then it would be reasonable to try using a standard GDLN to model the ReLU network.
+
+We will model the ReLU network as in \cref{eq:relu_gating}, focusing on how $g$ varies with time for each hidden neuron.
+We will look at the metrics
+\begin{align}
+  p(t) &= \PR_x( g(t, x) = g(t + \delta t, x) ) \qquad \text{for all $t$} \\
+  p_{\text{unif}} &= \PR_x( \{ g(t, x) = g(t', x) \ \forall t,t' \} )
+\end{align}
+
+
+
+
+\subsection{Predicting Loca(liza)tion}
+
+\subsection{Evolving Gates?}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Let's Consider a Single Layer with Linear Activation... %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Let's Consider a Single Layer with Linear Activation...}
+
+%% Model %%
+\subsection{Model}
+Our GDLN model is defined as follows:
+\begin{align}
+  \hat{y}(x) &= \frac{1}{K} \left( \sum_{k \in [K]} g_k(x) w_k^\top \right) x, \label{eq:gdln_model}
+\end{align}
+where $g_k$ are (node) gates, and $w_k \in \R^n$ are the rows of the first-layer weight matrix $W_1 \in \R^{K \times n}$.
+That is,
+\begin{align}
+  W_1 &= \begin{pmatrix} w_1^\top \\ \vdots \\ w_K^\top \end{pmatrix}
+\end{align}
+
+%% Gradient Flow %%
+\subsection{Gradient Flow}
+Recalling the GDLN paper, the gradient flow for $w_1$ is given by
+\begin{align}
+  \tau \frac{d}{dt} w_1^\top &= \frac{1}{K} \left[ \Sigma^{yx}(p_1) - \sum_{k \in [K]} w_k^\top \Sigma^{xx}(p_1,p_k) \right], \label{eq:grad_flow}
+\end{align}
+where
+\begin{align}
+  \Sigma^{yx}(p_i) &= \left\langle g_i y x^\top \right\rangle_{g,x,y} \\
+  \Sigma^{xx}(p_i,p_j) &= \left\langle g_i g_j x x^\top \right\rangle_{g,x}.
+\end{align}
+% Because we typically take $g$ to be a deterministic function of $x$, I will often suppress the dependence on $g$ in the expectation.
+
+%%%%%%%%%%%%%%%%%%
+%% General Case %%
+\subsection{General Case}
+Let us relabel %$w_i = W_i^\top$, 
+$b_i = \Sigma^{yx}(p_i)^\top$ and $A_{ij} = \Sigma^{xx}(p_i,p_j)$.
+Note that $A_{ij}$ is symmetric and $A_{ij} = A_{ji}$.
+Then, we can write the gradient flow for all weights as
+\begin{align}
+  K \tau \frac{d}{dt} \underbrace{\begin{bmatrix} w_1 \\ \vdots \\ w_K \end{bmatrix}}_{w \in \R^{Kn}}
+  &= \underbrace{\begin{bmatrix} b_1 \\ \vdots \\ b_k \end{bmatrix}}_{b \in \R^{Kn}} - \underbrace{\begin{bmatrix} A_{11} & \cdots & A_{1K} \\ \vdots & \ddots & \vdots \\ A_{K1} & \cdots & A_{KK} \end{bmatrix}}_{A \in \R^{Kn \times Kn}} \begin{bmatrix} w_1 \\ \vdots \\ w_K \end{bmatrix}. \label{eq:grad_flow_matrix}
+\end{align}
+Observe that $w$ is the vectorized form of our $K \times n$ first-layer weight matrix.
+Note also that $A$ is a symmetric real matrix, so we can diagonalize it as $A = P \Lambda P^\top$, where the columns of $P$ are the eigenvectors of $A$ and the diagonal entries of $\Lambda$ are the corresponding (nonnegative) eigenvalues.
+(It is symmetric because $A$ is block symmetric with blocks $A_{ij}$, and the blocks are also symmetric.)
+To see this more clearly, let us write
+\begin{align}
+  \tilde{g}(x) &= \begin{bmatrix} g_1(x) \\ \vdots \\ g_K(x) \end{bmatrix}. % \in \{ 0,1 \}^K.
+\end{align}
+Then,
+\begin{align}
+  A &= \left\langle (\tilde{g} \otimes x) (\tilde{g} \otimes x)^\top \right\rangle_{g,x}, \label{eq:A_kron}
+\end{align}
+which is clearly a symmetric matrix.
+(Interjection: Whatever distribution we have over $g$ should satisfy that $\tilde{g} \sim \Pi \tilde{g}$, where $\Pi$ is some permutation matrix on $K$ elements.
+That is, the distribution should be invariant to the ordering of the gates, since this is what we want empirically.
+% So, for a finite dataset with $|X|$ elements and binary gates, there are $\frac{2^{K |X|}}{K !}$ unique gating architectures, up to permutation.
+% FIXME: this can't be true...
+)
+
+We can reparameterize in terms of $u = P^\top w$ and $c = P^\top b$.
+\begin{align}
+  K \tau \frac{d}{dt} u &= - \Lambda u + c
+  \implies
+  u(t) = \Lambda^{-1} e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + \Lambda^{-1} c,
+\end{align}
+where $C$ is a constant diagonal matrix that defines the initial condition.
+So,
+\begin{align}
+  w(t) 
+  &= P \Lambda^{-1} e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + P \Lambda^{-1} c \\
+  &= A^{-1} P e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + A^{-1} b. \label{eq:grad_flow_solution}
+\end{align}
+
+%% Winning Gating Structure %%
+\subsection{Winning Gating Structure}
+Can we read off the winning gating structure from the gradient flow?
+For simplicity, let us assume we are sampling uniformly from a finite set of $G$ gates, $\{ g \}$.
+Then, we can write \cref{eq:grad_flow_matrix} as
+\begin{align}
+  % K \tau \frac{d}{dt} w_1 &= \frac{1}{G} \sum_{g \in \{ g \}} \left[ \left\langle g_1 y x^\top \right\rangle_{x,y \mid g} - \sum_{k \in [K]} \left\langle g_1 g_k y x^\top \right\rangle_{x,y \mid g} w_k \right].
+  K \tau \frac{d}{dt} w &= \frac{1}{G} \sum_{g \in \{ g \}} \left[ b_{x,y \mid g} - A_{x,y \mid g} w \right],
+\end{align}
+where the subscript on $b$ and $A$ indicates the conditioning on a specific gating structure $g$.
+Intuitively, a gating structure that minimizes the norm of $A$ will shrink the slowest.
+This is somewhat equivalent to minimizing the eigenvalues of $A$, since they are all nonnegative.
+(What happens if an eigenvalue is zero?)
+
+Let us consider a single block in $A$:
+\begin{align}
+  A_{ij} &= \langle g_i g_j x x^\top \rangle_{g,x}
+  = \PR( g_i = 1, g_j = 1 ) \langle x x^\top \rangle_{x \mid g_i = g_j = 1}.
+\end{align}
+
+Let us quickly ask: Does what we observe empirically match this intuition?
+We see that receptive fields come in pairs and tile the space.
+
+
+% The hope is that one of these terms dominates the others, so that we can read off the winning gating structure.
+% In terms of \cref{eq:grad_flow_solution},
+% \begin{align}
+%   w(t) &= 
+% \end{align}
+TODO: empirically look at dominating eigenvalues for finite case!
+
+%% Early Dynamics %%
+\subsubsection{Early Dynamics}
+For small $t$, but sufficiently large to see separation among different eigenvalues, can we predict the leading structure?
+
+%% Limiting Behavior %%
+\subsubsection{Limiting Behavior}
+If none of the eigenvalues are zero, then $w(\infty) = A^{-1} b$.
+If we write
+\begin{align}
+  \tilde{x} &= \begin{bmatrix} g_1(x) x \\ \vdots \\ g_K(x) x \end{bmatrix} \in \R^{Kn},
+\end{align}
+then $A = \langle \tilde{x} \tilde{x}^\top \rangle_{x,y,g}$ and $b = \langle \tilde{x} y \rangle_{x,y,g}$.
+Then, it is clear that this is the population solution to the OLS problem of regressing $y$ on $\tilde{x}$, averaging across the distributions of the data \textit{and} the gating architectures.
+
+In this context, one might ask, which gating structure minimizes the MSE loss?
+The loss is
+\begin{align}
+  \LL_{OLS} &= \left\langle \left( \tilde{x}'^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y,g})^{-1} \langle \tilde{x} y \rangle_{x,y,g} - y' \right)^2 \right\rangle_{x',y',g'} \\
+  &= \left\langle ( \tilde{x}'^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y,g})^{-1} \langle \tilde{x} y \rangle_{x,y,g} )^2 - 2 ( y' \tilde{x}'^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y,g})^{-1} \langle \tilde{x} y \rangle_{x,y,g} ) + (y')^2 \right\rangle_{x',y',g'} \\
+  &= \frac{1}{2} - \langle y \tilde{x}^\top \rangle_{x,y,g} (\langle \tilde{x} \tilde{x}^\top \rangle_{x,y,g})^{-1} \langle \tilde{x} y \rangle_{x,y,g} \\
+  &= \frac{1}{2} - \frac{1}{2} \langle \tilde{x} \rangle_{x, g \mid y=1}^\top (\langle \tilde{x} \tilde{x}^\top \rangle_{x, g \mid y=1} + \langle \tilde{x} \tilde{x}^\top \rangle_{x, g \mid y=0})^{-1} \langle \tilde{x} \rangle_{x, g \mid y=1}. \label{eq:ols_loss}
+\end{align}
+In the final step, we assumed (WLOG) that the negative class is $y=0$ and the positive class is $y=1$.
+(Throughout, we also assume that the classes are balanced.)
+The question is: For fixed $p_{\xi_1}$ and $p_{\xi_2}$, how do we choose the gates $g_k$ to minimize \cref{eq:ols_loss}?
+
+It may be useful to write this in terms of Kronecker products.
+Let
+\begin{align}
+  \tilde{g}(x) &= \begin{bmatrix} g_1(x) \\ \vdots \\ g_K(x) \end{bmatrix} \in \{ 0,1 \}^K.
+\end{align}
+Then, minimizing \cref{eq:ols_loss} is equivalent to maximizing
+\begin{align}
+  \LL^*(\tilde{g}) &= \langle \tilde{g} \otimes x \rangle_{x, g \mid y=1}^\top (\langle ( \tilde{g} \otimes x ) ( \tilde{g} \otimes x )^\top \rangle_{x, g \mid y=1} + \langle ( \tilde{g} \otimes x ) ( \tilde{g} \otimes x )^\top \rangle_{x, g \mid y=0})^{-1} \langle \tilde{g} \otimes x \rangle_{x, g \mid y=1} \label{eq:ols_kron}
+\end{align}
+% So, we want to maximize \cref{eq:ols_kron} 
+over $\tilde{g} : \supp(p_{\xi_1}) \cup \supp(p_{\xi_2}) \to \{0,1\}^K$.
+\emph{I will have to think more about this.}
+
+\emph{After a bit more thinking...}
+% Let's momentarily remove the precision matrix.
+% Then, we are left with $\norm{ \langle \tilde{x} \rangle_{x \mid y=1} }_2^2$.
+% The best gating structure would make all the gates identical, because of the symmetry of $\tilde{x}$.
+% Let us now reconsider the precision matrix.
+% As we get close to having all identical gates, the precision matrix's determinant blows up to infinity??
+I think that the best precision matrix would be maximally diagonal (no clue if this is actually true! but maybe it holds empirically?).
+For Gaussian data (at least), this mean that the blocks are independent conditioned on all the other blocks.
+Gates that tile the space without overlap would achieve this (I think?).
+But tbh I haven't got the slightest clue!!
+
+
+
+
+%% Example 1: Exclusive gates %%
+\subsection{Exclusive Gates}
+Let us assume that the gates are exclusive, that is, only one gate is active at a time.
+Then, $\Sigma^{xx}(p,q) = 0$ for $p \neq q$.
+
+% Note that $\Sigma^{xx}(p_1,p_2) = 0$ by the construction of our gates, since they are never both nonzero.
+Then $A$ becomes block diagonal.
+We can write the gradient flow for $w_1$ as
+% \begin{align}
+%   \tau \frac{d}{dt} W_1 &= \frac{1}{K} \left[ \Sigma^{yx}(p_1) - W_1 \Sigma^{xx}(p_1,p_1) \right]. \label{eq:grad_flow_exclusive}
+% \end{align}
+% So, we will only need to compute $\Sigma^{yx}(p_1)$ and $\Sigma^{xx}(p_1,p_1)$.
+
+% We also note that $W_1$ is a $1 \times n$ matrix.
+% Again, we relabel for simplicity. % in terms of $w_1 = W_1^\top$, which we view as an $n$-dimensional vector.
+% % Let us also write $b_1 = \Sigma^{yx}(p_1)^\top$ and $A = \Sigma^{xx}(p_1,p_1)$.
+% So,
+\begin{align}
+  K \tau \frac{d}{dt} w_1 &= - A_{11} w_1 + b_1.
+\end{align}
+
+Note that $A_{11} = \Sigma^{xx}(p_1, p_1)$ is always symmetric (and real).
+So, we can diagonalize it as $A_{11} = P \Lambda P^\top$, where the columns of $P$ are $v_1, \ldots, v_n$ and the diagonal entries of $\Lambda$ are $\lambda_1, \ldots, \lambda_n$.
+Let us introduce $u_1 = P^\top w_1$ and $c_1 = P^\top b_1$.
+Then,
+\begin{align}
+  K \tau \frac{d}{dt} u_1 &= - \Lambda u_1 + c_1. \label{eq:grad_flow_exclusive_reparam}
+\end{align}
+This ODE is solved by
+\begin{align}
+  u_1(t) &= \Lambda^{-1} e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + \Lambda^{-1} c_1,
+\end{align}
+where $C$ is a constant diagonal matrix that defines the initial condition.
+Then,
+\begin{align}
+  w_1(t) &= P \left( \Lambda^{-1} e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + \Lambda^{-1} c \right) \\
+  &= P \Lambda^{-1} e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + P \Lambda^{-1} c_1 \\
+  &= A_{11}^{-1} \left( P e^{ -\frac{t}{K \tau} \Lambda + C } \mathbf{1} + b_1 \right).
+\end{align}
+% We can write $C$ in terms of $w(0)$, the initial condition, but it's messy:
+% \begin{align}
+%   % w(0) &= A^{-1} (P e^{ C } \mathbf{1} + b) \\
+%   % P^\top( A w(0) - b ) &= e^{C} \mathbf{1} \\
+%   % C_{ii} &= \log( (P^\top( A w(0) - b ))_i ),
+%   C_{ii} &= \log( v_i^\top ( A_{11} w_1(0) - b_1 ) ),
+% \end{align}
+% so I'll just stick with $C$.
+
+% where we absorb $P$ into $C$ since it is some arbitrary constant vector.
+Recalling $A_{11}$ and $b_1$,
+\begin{align}
+  w_1(t) &= ( \Sigma^{xx}(p_1,p_1) )^{-1} \left( P e^{ -\frac{t}{\tau} \Lambda + C } \mathbf{1} + \Sigma^{yx}(p_1)^\top \right).
+\end{align}
+So,
+\begin{align}
+  % W_1(\infty) &= w^\top(\infty) = (\Sigma^{yx}(p_1)) ( \Sigma^{xx}(p_1,p_1) )^{-1}.
+  w_1(\infty) &= ( \Sigma^{xx}(p_1,p_1) )^{-1} \left( P e^{ -\frac{t}{\tau} \Lambda + C } \mathbf{1} + \Sigma^{yx}(p_1)^\top \right).
+\end{align}
+As with above, this is the population solution to OLS, $(X^\top X)^{-1} X^\top y = ( \langle x x^\top \rangle )^{-1} ( \langle x y \rangle )$.
+
+So, each weight matrix converges to the OLS solution on the subset of the data determined by its gate.
+
+% In the limit,
+% \begin{align}
+%   \hat{y}(x) &= \frac{1}{K} \left( \sum_{k\in[K]} g_k(x) ( \Sigma^{xx}(p_k,p_k) )^{-1} \Sigma^{yx}(p_k)^\top \right) x \\
+%   &= \frac{1}{K} \left( \sum_{k\in[K]} ( \Sigma^{xx}(p_k,p_k) )^{-1} \Sigma^{yx}(p_k)^\top \right) x \\
+% \end{align}
+
+\subsection{Redundant Gates}
+What if $g_1 = g_2$?
+Then, $b_1 = b_2$ and $A_{11} = A_{12} = A_{22}$.
+So,
+% \begin{align}
+%   \tau \frac{d}{dt} W_1 
+%   &= \frac{1}{K} \left[ \Sigma^{yx}(p_1) - W_1 \Sigma^{xx}(p_1,p_1) - W_2 \Sigma^{xx}(p_1,p_2) \right], \\
+%   \tau \frac{d}{dt} W_2 &= \frac{1}{K} \left[ \Sigma^{yx}(p_2) - W_1 \Sigma^{xx}(p_2,p_1) - W_2 \Sigma^{xx}(p_2,p_2) \right].
+% \end{align}
+\begin{align}
+  K \tau \frac{d}{dt} w_1 &= - A_{11} (w_1 + w_2) + b_1 , \\
+  K \tau \frac{d}{dt} w_2 &= - A_{11} (w_1 + w_2) + b_1 .
+\end{align}
+Clearly, then, $w_1 - w_2$ is a constant vector.
+Moreover, $\frac{1}{2} (w_1 + w_2)$ evolves according to
+\begin{align}
+  \frac{K \tau}{2} \frac{d}{dt} (w_1 + w_2) &= - A_{11} (w_1 + w_2) + b_1.
+\end{align}
+Writing $2 \Delta = w_1 - w_2$ and $w_1 + w_2 = 2 (w_1 - \Delta)$, we have
+\begin{align}
+  K \tau \frac{d}{dt} w_1
+  &= K \tau \frac{d}{dt} (w_1 - \Delta)
+  = - 2 A_{11} (w_1 - \Delta) + b_1.
+\end{align}
+We can plug this into our solution from the previous section to get
+\begin{align}
+  w_1(t) &= \frac{1}{2} A_{11}^{-1} \left( P e^{-\frac{t}{K \tau} \Lambda + C} \mathbf{1} + b_1 \right).
+\end{align}
+So,
+\begin{align}
+  w_2(t) &= \frac{1}{2} A_{11}^{-1} \left( P e^{-\frac{t}{K \tau} \Lambda + C} \mathbf{1} + b_1 \right) - (w_1(0) - w_2(0)).
+\end{align}
+
+
+% Note $\Sigma^{xx}(p_1,p_2) = \Sigma^{xx}(p_2,p_1)$.
+% Define $A_{ij} = \Sigma^{xx}(p_i,p_j)$ and $b_i = \Sigma^{yx}(p_i)^\top$.
+% Let $w_i = W_i^\top$.
+% Then,
+% \begin{align}
+%   K \tau \frac{d}{dt} w_1 &= b_1 - A_{11} w_1 - A_{12} w_2, \\
+%   K \tau \frac{d}{dt} w_2 &= b_2 - A_{12} w_1 - A_{22} w_2.
+% \end{align}
+
+% So,
+% \begin{align}
+%   &\frac{K \tau}{2} \frac{d}{dt} \langle w_1 - w_2, w_1 - w_2 \rangle \\
+%   &= K \tau \langle w_1 - w_2, \frac{d}{dt} w_1 - \frac{d}{dt} w_2 \rangle \\
+%   &= \langle w_1 - w_2, (b_1 - A_{11} w_1 - A_{12} w_2) - (b_2 - A_{12} w_1 - A_{22} w_2) \rangle \\
+%   &= \langle w_1 - w_2, (b_1 - b_2) + (A_{12} - A_{11}) w_1 - (A_{12} - A_{22}) w_2 \rangle \\
+%   &= \langle w_1 - w_2, (b_1 - b_2) + (A_{12} - A_{11}) (w_1 - w_2) + ((A_{12} - A_{11}) - (A_{12} - A_{22})) w_2 \rangle \\
+% \end{align}
+
+% Note
+% \begin{align}
+%   &\frac{d}{dt} \langle w_1, w_2 \rangle \\
+%   &= \langle \frac{d}{dt} w_1, w_2 \rangle + \langle w_1, \frac{d}{dt} w_2 \rangle \\
+%   &\propto \langle b_1 - A_{11} w_1 - A_{12} w_2, w_2 \rangle + \langle w_1, b_2 - A_{12} w_1 - A_{22} w_2 \rangle \\
+%   &= \langle b_1, w_2 \rangle - \langle A_{11} w_1, w_2 \rangle - \langle A_{12} w_2, w_2 \rangle + \langle w_1, b_2 \rangle - \langle A_{12} w_1, w_1 \rangle - \langle w_1, A_{22} w_2 \rangle \\
+%   &= \langle b_1, w_2 \rangle + \langle w_1, b_2 \rangle - (\langle A_{12} w_2, w_2 \rangle + \langle A_{12} w_1, w_1 \rangle) - (\langle A_{11} w_1, w_2 \rangle + \langle A_{22} w_1, w_2 \rangle) \\
+%   &= \langle b_1, w_2 \rangle + \langle w_1, b_2 \rangle - (\langle A_{12} (w_1+w_2), w_1+w_2 \rangle - 2 \langle A_{12} w_1, w_2 \rangle) - (\langle A_{11} w_1, w_2 \rangle + \langle A_{22} w_1, w_2 \rangle).
+% \end{align}
+% If we assume $w_1(0) = w_2(0)$, then
+% \begin{align}
+%   \left. \frac{d}{dt} \langle w_1, w_2 \rangle \right|_{t=0}
+%   &= \langle b_1, w_1 \rangle - \langle A_{11} w_1, w_1 \rangle - \langle A_{12} w_1, w_1 \rangle + \langle w_1, b_2 \rangle - \langle A_{12} w_1, w_1 \rangle - \langle w_1, A_{22} w_1 \rangle
+% \end{align}
+
+
+\section{Theory-driven Experiments}
+
+\subsection{General Case}
+
+\subsection{Single Gate}
+
+\subsection{Redundant Gates}
+
+
+
+
+
+
+\newpage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Single step in a ReLU Network %%
+\subsection{Simple ReLU Network}
+
+Let's consider what happens in a single step of a network with ReLU activation.
+% We will consider a network with just one neuron, since I've observed empirically that this still yields localization only when the gain is sufficiently large, and it's much easier to analyze.
+We make predictions with
+\begin{align}
+  \hat{y}(x) &= \frac{1}{K} \sum_{k \in [K]} \text{ReLU}(\langle w_k, x \rangle).
+\end{align}
+We consider MSE loss,
+\begin{align}
+  \LL &= \frac{1}{2} \E_{X,Y} \left[ \left( \hat{y}(X) - Y \right)^2 \right].
+\end{align}
+The gradient flow for $w_1$ is given by
+\begin{align}
+  \tau \frac{d}{dt} w_1
+  &= -\E_{X,Y} \left[ \left( \text{ReLU}(\langle w_1(t), X \rangle) - Y \right) \frac{\partial}{\partial w_1} \left[ \text{ReLU}(\langle w_1(t), X \rangle) \right] \right] \\
+  % % &\begin{multlined} = \E_{x \mid y=1} \left[ \left( \text{ReLU}(\langle w_1(t), x \rangle) - y \right) \frac{\partial}{\partial w_1} \left[ \text{ReLU}(\langle w_1(t), x \rangle) \right] \right] \PR(y=1) \\
+  % % + \E_{x \mid y=0} \left[ \left( \text{ReLU}(\langle w_1(t), x \rangle) - y \right) \frac{\partial}{\partial w_1} \left[ \text{ReLU}(\langle w_1(t), x \rangle) \right] \right] \PR(y=0) \end{multlined} \\
+  % % &= \E_{x,y \mid \langle w_1(t), x \rangle > 0} \left[ \left( \text{ReLU}(\langle w_1(t), x \rangle) - y \right) x \right] \PR( \langle w_1(t), x \rangle > 0 ) \\
+  % &= \E_{x,y \mid \langle w_1(t), x \rangle > 0} \left[ \left( \langle w_1(t), x \rangle - y \right) x \right] \PR( \langle w_1(t), x \rangle > 0 ) \\
+  &= \big( \underbrace{ \E_{X, Y \mid \langle w_1(t), X \rangle > 0} \left[ Y X \right] }_{\equiv (I)} - \underbrace{ \E_{X, Y \mid \langle w_1(t), X \rangle > 0} \left[ \langle w_1(t), X \rangle X \right] }_{\equiv (II)} \big) \PR( \langle w_1(t), X \rangle > 0 ).
+  % % &\begin{multlined} = \E_{x \mid y=1, \langle w_1(t), x \rangle > 0} \left[ \left( \text{ReLU}(\langle w_1(t), x \rangle) - y \right) \frac{\partial}{\partial w_1} \left[ \text{ReLU}(\langle w_1(t), x \rangle) \right] \right] \PR(y=1) \\
+  % %   + \E_{x \mid y=0} \left[ \left( \text{ReLU}(\langle w_1(t), x \rangle) - y \right) \frac{\partial}{\partial w_1} \left[ \text{ReLU}(\langle w_1(t), x \rangle) \right] \right] \PR(y=0) \end{multlined} \\
+\end{align}
+
+Recall that $X$ is a mixture of $X \mid Y = 1$ and $X \mid Y = 0$.
+So, we will compute these expectations separately.
+% Note that
+% \begin{align}
+%   &\begin{multlined}\E_{x, y \mid \langle w_1(t), x \rangle > 0} \left[ f(x) \right] = \E_{x \mid y = 1, \langle w_1(t), x \rangle > 0} \left[ f(x) \right] \PR(y = 1 \mid \langle w_1(t), x \rangle > 0) \\
+%   + \E_{x \mid y = 0, \langle w_1(t), x \rangle > 0} \left[ f(x) \right] \PR(y = 0 \mid \langle w_1(t), x \rangle > 0) \end{multlined}.
+% \end{align}
+Let us write $S = \langle w_1(t), X \rangle$.
+Then, we can use the law of total expectation to write
+\begin{align}
+  \E_{X \mid Y = 1, \langle w_1(t), X \rangle > 0} \left[ f(X) \right]
+  % &= \int_{\R^n} f(x) p(x \mid y = 1, S > 0) dx \\
+  % &= \int_{\R^n} f(x) \frac{p(x, S > 0 \mid y = 1)}{p(S > 0 \mid y = 1)} dx \\
+  % &= \int_{\R^n} f(x) \frac{\int_0^\infty p(x, S = s \mid y = 1) ds}{p(S > 0 \mid y = 1)} dx \\
+  % &= \int_{\R^n} \int_0^\infty f(x) \frac{ p(x \mid S = s, y = 1) p(S = s \mid y = 1) }{ p(S > 0 \mid y = 1) } ds dx \\
+  % &= \int_0^\infty \int_{\R^n} f(x) \frac{ p(x \mid S = s, y = 1) p(S = s \mid y = 1) }{ p(S > 0 \mid y = 1) } dx ds && \text{Fubini} \\
+  % &= \int_0^\infty \frac{ p(S = s \mid y = 1) }{ p(S > 0 \mid y = 1) } \int_{\R^n} f(x) p(x \mid S = s, y = 1) dx ds \\
+  % &= \int_0^\infty \frac{ p(S = s \mid y = 1) }{ p(S > 0 \mid y = 1) } \E_{x \mid S = s, y = 1}\left[ f(x) \right] ds \\
+  &= %\frac{ 1 }{ p(S > 0 \mid y = 1) } 
+  \E_{S > 0 \mid y = 1} \left[ \E_{X \mid S, y = 1}\left[ f(X) \right] \right].
+\end{align}
+% Let us rewrite the density:% using Bayes' rule:
+% \begin{align}
+%   &p(x, \langle w_1(t), x \rangle = s \mid y = 1, \langle w_1(t), x \rangle > 0) \\
+%   &= p(x \mid \langle w_1(t), x \rangle = s, y = 1, \langle w_1(t), x \rangle > 0) p(x \mid \langle w_1(t), x \rangle = s, y = 1, \langle w_1(t), x \rangle > 0)
+% \end{align}
+
+So, we need to find the distribution of $X$ conditioned on $S \equiv \langle w_1(t), X \rangle = s$.
+In general, this is very challenging.
+We will split this into two terms, one of which disappears when $X$ is Gaussian.
+Let $\Sigma$ be the covariance of $x$ (recall it has mean 0).
+We write
+\begin{align}
+  X &= AX + S v,
+\end{align}
+where
+\begin{align}
+  v &= \frac{1}{ w_1(t)^\top \Sigma w_1(t) } \Sigma w_1(t), \\
+  A &= I_n - v w_1(t)^\top.
+\end{align}
+Thus, $\E_{X \mid S=s}[X] = \E_{X \mid S=s}[AX] + s v$.
+Our choice of $A$ and $v$ implies that $AX$ and $S$ have zero \textit{covariance} (see \href{https://math.stackexchange.com/questions/2784531/distribution-of-joint-gaussian-conditional-on-their-sum/2943590#2943590}{this post}).
+When $X$ is Gaussian, this implies that $AX$ and $S$ are independent, so we'd have $\E_{X \mid S=s}[X] = A \E[X] + s v = s v$.
+% We can show that $A \Sigma A^\top = A \Sigma$ (I think—see paper notes from 10/17).
+
+With this representation,
+\begin{align}
+  \E_{X \mid Y=1, S>0} \left[ YX \right] 
+  &= \E_{S>0 \mid Y=1} \left[ \E_{X \mid S, Y=1}[AX] + S v \right] \\
+  &= \E_{X \mid Y=1, S>0} \left[ AX \right] + \frac{ \E_{S>0 \mid Y=1} \left[ S \right] }{ w_1(t)^\top \Sigma_1 w_1(t) } \Sigma_1 w_1(t), \label{eq:exp_yx} \\
+  %
+  \E_{X \mid Y=1, S>0} \left[ S X \right] 
+  &= \E_{S>0 \mid Y=1} \left[ S \E_{X \mid S, Y=1}[AX] + S^2 v \right] \\
+  &= \E_{X \mid Y=1, S>0} \left[ S AX \right] + \E_{S>0 \mid Y=1} \left[ S^2 \right] v \\
+  &= \E_{X \mid Y=1, S>0} \left[ S AX \right] + w_1(t)^\top \Sigma_1 w_1(t) v, \\
+  &= \E_{X \mid Y=1, S>0} \left[ S AX \right] + \Sigma_1 w_1(t). \label{eq:exp_sx}
+\end{align}
+Note that if $X$ were Gaussian, then the first terms in \cref{eq:exp_sx,eq:exp_yx} would be zero.
+
+Now, we evaluate (I) and (II).
+\begin{align}
+  (I) &= \E_{X \mid S>0} \left[ S AX \right] + \left[ \PR(Y=1 \mid S>0) \Sigma_1 + \PR(Y=0 \mid S>0) \Sigma_0 \right] w_1(t), \\
+  (II) &= \E_{X \mid S>0} \left[ AX \right] + \PR(Y=1 \mid S>0) \frac{ \E_{S>0 \mid Y=1} \left[ S \right] }{ w_1(t)^\top \Sigma_1 w_1(t) } \Sigma_1 w_1(t)
+\end{align}
+
+Then,
+\begin{align}
+  &\left[ (I) - (II) \right] \PR( S > 0 ) \\
+  &\begin{multlined} = -\E_{X \mid S>0} \left[ (S-1) AX \right]  \\
+  - \left[ \PR(Y=1 \mid S>0) \left( \frac{ \E_{S>0 \mid Y=1} \left[ S \right] }{ w_1(t)^\top \Sigma_1 w_1(t) } - 1 \right) \Sigma_1 + \PR(Y=0 \mid S>0) \frac{ \E_{S>0 \mid Y=0} \left[ S \right] }{ w_1(t)^\top \Sigma_0 w_1(t) } \Sigma_0 \right] w_1(t).
+  % + \left[ \frac{ \E_{S>0, Y=1} \left[ S \right] - 1 }{ w_1(t)^\top \Sigma_1 w_1(t) } \Sigma_1 + \frac{ \E_{S>0, Y=0} \left[ S \right] - 1 }{ w_1(t)^\top \Sigma_0 w_1(t) } \Sigma_0 \right] w_1(t)
+  \end{multlined}
+\end{align}
+By symmetry, $\PR(Y=1 \mid S>0) = \frac{1}{2}$ and $PR(S > 0) = \frac{1}{2}$.
+Then,
+\begin{align}
+  4 \tau \frac{d}{dt} w_1
+  &= -\E_{X \mid S>0} \left[ (S-1) AX \right] - \left[ \left( \frac{ \E_{S>0 \mid Y=1} \left[ S \right] }{ w_1(t)^\top \Sigma_1 w_1(t) } - 1 \right) \Sigma_1 + \frac{ \E_{S>0 \mid Y=0} \left[ S \right] }{ w_1(t)^\top \Sigma_0 w_1(t) } \Sigma_0 \right] w_1(t)
+\end{align}
+Also recall that $\Sigma_1$ and $\Sigma_0$ both diagonalize in the discrete Fourier basis, which we denote with $P$, and their corresponding diagonal matrices of eigenvalues $\Lambda_1$ and $\Lambda_0$.
+Write $u_1 = P^\top w_1$.
+\begin{align}
+  4 \tau \frac{d}{dt} u_1
+  &= -\E_{X \mid S>0} \left[ (S-1) P^\top AX \right] - \left[ \left( \frac{ \E_{S>0 \mid Y=1} \left[ S \right] }{ u_1(t)^\top \Lambda_1 u_1(t) } - 1 \right) \Lambda_1 + \frac{ \E_{S>0 \mid Y=0} \left[ S \right] }{ u_1(t)^\top \Lambda_0 u_1(t) } \Lambda_0 \right] u_1(t).
+\end{align}
+
+Let us expand the first term for $Y=1$.
+Define $\Xi = P^\top X$.
+\begin{align}
+  \E_{X \mid Y=1, S>0} \left[ (S-1) P^\top AX \right]
+  &= \E_{X \mid Y=1, S>0} \left[ (S-1) P^\top \left( I_n - \frac{\Sigma_1 w_1(t) w_1(t)^\top}{w_1(t)^\top \Sigma_1 w_1(t)} \right) X \right] \\
+  &= \E_{\Xi \mid Y=1, \langle u_1(t), \Xi \rangle > 0} \left[ (\langle u_1(t), \Xi \rangle-1) \left( I_n - \frac{\Lambda_1 u_1(t) u_1(t)^\top}{u_1(t)^\top \Lambda_1 u_1(t)} \right) \Xi \right].
+\end{align}
+Now, we must stop and ask: what is $\Xi$?
+Recall that $P$ is the discrete Fourier basis.
+Importantly, it is actually the \textit{real} part of the discrete Fourier basis since $\Sigma_1$ is symmetric.
+That is, with $\omega = e^{-\frac{2 \pi i}{n}}$,
+\begin{align}
+  P_{:,j} 
+  &= \Re \frac{1}{\sqrt{n}} \begin{bmatrix} 1 \\ \omega^j \\ \omega^{2j} \\ \vdots \\ \omega^{(n-1)j} \end{bmatrix}
+  = \frac{1}{\sqrt{n}} \begin{bmatrix} 1 \\ \cos( \frac{2 \pi}{n} j ) \\ \cos( \frac{2 \pi}{n} 2j ) \\ \vdots \\ \cos( \frac{2 \pi}{n} (n-1) j ) \end{bmatrix}.
+\end{align}
+
+$\Xi$ is the discrete Fourier transform (DFT) of $X$.
+
+TRY COMPUTING DENSITY OF NON-GAUSSIAN USING TRICK; DON'T THINK FOURIER APPROACH WILL BE VERY HELPFUL TBH.
+
+
+
+
+
+\subsubsection{Gaussian $X$}
+Now, let us assume that $X$ is Gaussian.
+Then, $\E_{X \mid S>0} \left[ (S-1) P^\top AX \right] = 0$.
+Furthermore,
+\begin{align}
+  \E_{S>0 \mid Y=1} \left[ S \right] 
+  &= \sqrt{ \frac{2}{\pi} } \left( w_1(t)^\top \Sigma_1 w_1(t) \right)^{\frac{1}{2}}
+  = \sqrt{ \frac{2}{\pi} } \left( u_1(t)^\top \Lambda_1 u_1(t) \right)^{\frac{1}{2}}.
+\end{align}
+Then, the gradient flow becomes
+\begin{align}
+  4 \tau \frac{d}{dt} u_1
+  &= -\left[ \left( \frac{ 1 }{ \sqrt{ u_1(t)^\top \Lambda_1 u_1(t) } } - 1 \right) \Lambda_1 + \frac{ 1 }{ \sqrt{ u_1(t)^\top \Lambda_0 u_1(t) } } \Lambda_0 \right] u_1(t).
+\end{align}
+
+
+
+
+
+\newpage
+So,
+\begin{align}
+  \E_{S > 0 \mid y = 1} \left[ \E_{x \mid S, y = 1}\left[ x \right] \right]
+  &= \E_{S > 0 \mid y = 1} \left[ s v_1 \right] 
+  = \E_{S > 0 \mid y = 1} \left[ s \right] v_1, \\
+  \E_{S > 0 \mid y = 1} \left[ \E_{x \mid S, y = 1}\left[ x x^\top \right] \right]
+  &= \E_{S > 0 \mid y = 1} \left[ A_1 \Sigma_1 A_1^\top \right]
+  = A_1 \Sigma_1 A_1^\top.
+\end{align}
+Note that $S \sim \NN\left( 0, w_1(t)^\top \Sigma w_1(t) \right)$.
+So, $\E_{S > 0 \mid y = 1} \left[ s \right] = \left( \frac{2}{\pi} w_1(t)^\top \Sigma w_1(t) \right)^{\frac{1}{2}}$.
+In summary,
+\begin{align}
+  \E_{x \mid y = 1, \langle w_1(t), x \rangle > 0} \left[ x \right]
+  &= \frac{ \left( \frac{2}{\pi} w_1(t)^\top \Sigma w_1(t) \right)^{\frac{1}{2}} }{ w_1(t)^\top \Sigma w_1(t) } \Sigma w_1(t)
+  = \sqrt{ \frac{2}{\pi} } \left( w_1(t)^\top \Sigma w_1(t) \right)^{-\frac{1}{2}} \Sigma w_1(t), \\
+  \E_{x \mid y = 1, \langle w_1(t), x \rangle > 0} \left[ x x^\top \right]
+  &= A_1 \Sigma_1 A_1^\top
+  = \left( I_n - \frac{1}{w_1(t)^\top \Sigma_1 w_1(t)} \Sigma_1 w_1(t) w_1(t)^\top \right) \Sigma_1.
+\end{align}
+
+Rewriting the gradient flow,
+\begin{align}
+  &\frac{\tau}{\PR( \langle w_1(t), x \rangle > 0 )} \frac{d}{dt} w_1 \\
+  & \begin{multlined} =\left[ \left( I_n - \frac{1}{w_1(t)^\top \Sigma_1 w_1(t)} \Sigma_1 w_1(t) w_1(t)^\top \right) \Sigma_1 + \left( I_n - \frac{1}{w_1(t)^\top \Sigma_0 w_1(t)} \Sigma_0 w_1(t) w_1(t)^\top \right) \Sigma_0 \right] w_1(t) \\
+  - \left[ \sqrt{ \frac{2}{\pi} } \left( w_1(t)^\top \Sigma w_1(t) \right)^{-\frac{1}{2}} \Sigma w_1(t) \right] \end{multlined} \\
+  &= %\left( \Sigma_1 w_1(t) - \Sigma_1 w_1(t) \right) + \left( \Sigma_0 w_1(t) - \Sigma_0 w_1(t) \right) 
+    - \sqrt{ \frac{2}{\pi} } \left( w_1(t)^\top \Sigma_1 w_1(t) \right)^{-\frac{1}{2}} \Sigma_1 w_1(t).
+\end{align}
+By symmetry, $\PR( \langle w_1(t), x \rangle > 0 ) = \frac{1}{2}$.
+\begin{align}
+  \tau \frac{d}{dt} w_1
+  &= - 2 \sqrt{ \frac{2}{\pi} } \left[ w_1(t)^\top \Sigma_1 w_1(t) \right]^{-\frac{1}{2}} \Sigma_1 w_1(t).
+\end{align}
+Let us write $\Sigma_1 = P \Lambda P^\top$, where $\Lambda$ is diagonal and $P$ is orthogonal, and $u_1 = P^\top w_1$.
+Then,
+\begin{align}
+  \tau \frac{d}{dt} u_1
+  &= - 2 \sqrt{ \frac{2}{\pi} } \left[ u_1(t)^\top \Lambda u_1(t) \right]^{-\frac{1}{2}} \Lambda u_1(t). \label{eq:grad_flow_diag}
+\end{align}
+So it appears that this shrinks $u_1$ to 0, and this is accelerated as $u_1$ gets small by the weighted norm.
+This is consistent with what we observe for the Gaussian case.
+But what happens when $x$ is non-Gaussian.
+Analytically, it's hard to say exactly.
+But it seems like the input-input covariance terms will \emph{not} cancel, and so we will have another term that hopefully does more than just shrink $u_1$ to 0.
+It is surprising that $w_1(t)$ pops out of the input-output term.
+This \emph{does not happen in the gated linear network}, and this seems like a key difference.
+What does this say about gating early during training?
+I should double-check this to make sure it's right.
+If this weren't the case though, we would get a bias term that probably yields localization (or some nonzero structure).
+
+What we see in \cref{eq:grad_flow_diag} is that the largest eigenvalues are shrunk fastest.
+This corresponds to the longest-frequency signals disappearing quickly.
+So, we see that the Gaussian noise quickly turns into a short-range oscillation, which is then damped out to 0.
+This seems consistent with my ReLU simulations, but I need to make sure the results are perfectly comparable (same learning rate, using exact same data at each time step, etc.)
+
+
+
+% Note that
+% \begin{align}
+%   \frac{\tau}{2} \frac{d}{dt} \langle u_1, u_1 \rangle
+%   &= \langle u_1, \tau \frac{d}{dt} u_1 \rangle \\
+%   &= - 2 \sqrt{ \frac{2}{\pi} } \left[ u_1(t)^\top \Lambda u_1(t) \right]^{-\frac{1}{2}} \langle u_1, \Lambda u_1(t) \rangle \\
+%   &= - 2 \sqrt{ \frac{2}{\pi} } \left[ u_1(t)^\top \Lambda u_1(t) \right]^{\frac{1}{2}}.
+% \end{align}
+
+
+
+% % So, we can write the first term in \cref{eq:lotl_xx} as
+% % \begin{align}
+% %   &\E_{S} \left[ \E_{x \mid \langle w_1(t), x \rangle = S, y = 1} \left[ x x^\top \right] \PR\left( y = 1 \mid \langle w_1(t), x \rangle = S \right) \right] \\
+% %   &= \E_S \left[ A_1 \Sigma_1 \PR\left( y = 1 \mid \langle w_1(t), x \rangle = S \right) \right] \\
+% %   &= A_1 \Sigma_1 \PR\left( y = 1 \mid \langle w_1(t), x \rangle > 0 \right).
+% % \end{align}
+% Here, $\Sigma_1$ denotes the covariance for $x \mid y = 1$ and $A_1$ denotes the corresponding matrix $A$.
+% We can do the same for the second term in \cref{eq:lotl_xx} corresponding to $y = 0$, writing it in terms of $\Sigma_0$ and $A_0$.
+% Thus,
+% \begin{align}
+%   &\E_{x \mid \langle w_1(t), x \rangle > 0} \left[ x x^\top \right] \\
+%   % &= A_1 \Sigma_1 \PR\left( y = 1 \mid \langle w_1(t), x \rangle > 0 \right) \PR\left( \langle w_1(t), x \rangle > 0 \right) + A_0 \Sigma_0 \PR\left( y = 0 \mid \langle w_1(t), x \rangle > 0 \right) \PR\left( \langle w_1(t), x \rangle > 0 \right) \\
+%   &= A_1 \Sigma_1 \PR\left( \langle w_1(t), x \rangle > 0 \mid y = 1 \right) \PR(y = 1) + A_0 \Sigma_0 \PR\left( \langle w_1(t), x \rangle > 0 \mid y = 0 \right) \PR( y = 0 ).
+% \end{align}
+% Let us evaluate these conditional probabilities.
+% Again, recall that $x \mid y=1 \sim \NN\left( 0, \Sigma_1 \right)$.
+% We can immediately recognize that $\langle w_1(t), x \rangle$ is a one-dimensional Gaussian with mean zero.
+% Thus, the conditional probability is $\frac{1}{2}$, for both $y=1$ and $y=0$.
+% So,
+% \begin{align}
+%   &\E_{x \mid \langle w_1(t), x \rangle > 0} \left[ x x^\top \right] \\
+%   &= \frac{1}{2} \left( A_1 \Sigma_1 \PR(y = 1) + A_0 \Sigma_0 \PR( y = 0 ) \right) \\
+%   &= \frac{1}{4} \left( A_1 \Sigma_1 + A_0 \Sigma_0 \right),
+% \end{align}
+% where in the final step we assume that the classes are balanced, so $\PR(y=1) = \PR(y=0) = \frac{1}{2}$.
+
+% We have successfully computed the input-input covariance matrix for Gaussian $x$.
+% Now, let us compute the input-output covariance matrix.
+% We use the same approach,
+% \begin{align}
+%   \E_{x \mid \langle w_1(t), x \rangle > 0} \left[ y x \right]
+%   &= \E_{S} \left[ \E_{x \mid \langle w_1(t), x \rangle = S} \left[ y x \right] \right] \\
+%   &= \E_{S} \left[ \E_{x \mid \langle w_1(t), x \rangle = S, y = 1} \left[ x \right] \PR(y = 1 \mid \langle w_1(t), x \rangle = S) \right] \\
+%   &= \E_{S} \left[ S v_1 \PR(y = 1 \mid \langle w_1(t), x \rangle = S) \right] && \text{from above} \\
+%   &= \E_{S} \left[ S \PR(y = 1 \mid \langle w_1(t), x \rangle = S) \right] v_1.
+% \end{align}
+
+
+
+
+\end{document}

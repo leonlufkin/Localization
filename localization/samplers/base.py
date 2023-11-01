@@ -222,6 +222,7 @@ class EpochSampler(SingletonSampler):
     #epoch_key = jax.random.fold_in(self.key, epoch_idx)
     #permuted_index = self.permute_dataset_index(epoch_key)[index_in_epoch]
     permuted_index = index_in_epoch
+    # print(permuted_index)
 
     return self.dataset[permuted_index]
 
