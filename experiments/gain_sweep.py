@@ -62,8 +62,8 @@ if __name__ == '__main__':
         init_fn=models.xavier_normal_init,
         init_scale=1.,
         # learning config
-        num_epochs=5000,
-        evaluation_interval=100,
+        num_epochs=20000,
+        evaluation_interval=20,
         optimizer_fn=optax.sgd,
         # experiment config
         seed=0,
@@ -77,8 +77,8 @@ if __name__ == '__main__':
         kwargs_array=product_kwargs(
             **tupify(config_),
             # NOTE: This is the only line that changes between experiments.
-            gain=np.linspace(0.01, 3, 21),
-            num_hiddens=(40,),
-            learning_rate=(5.,),
+            gain=np.logspace(-2, 1, 100),
+            num_hiddens=(1,),
+            learning_rate=(0.01,),
         ),
     )
