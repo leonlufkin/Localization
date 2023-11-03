@@ -33,6 +33,24 @@ def slice_to_array(s: slice, array_length: int):
 
   return jnp.array(range(start, stop, step))
 
+def build_DRT(n):
+  DFT = jnp.zeros((n, n), dtype=complex)
+  w = jnp.exp(-2 * jnp.pi * 1j / n)
+  for i in range(DFT.shape[0]):
+    DFT = DFT.at[:,i].set(w ** (i * jnp.arange(n)) / jnp.sqrt(n))
+
+  DCT = DFT.real
+  DST = DFT.imag
+
+  DRT_ = jnp.sqrt(2) * jnp.concatenate((DCT[:, :(n//2+1)], DST[:, 1:(n//2)]), axis=1)
+  DRT_ = DRT_.at[:,0].set(DRT_[:,0] / jnp.sqrt(2))
+  DRT_ = DRT_.at[:,n//2].set(DRT_[:,n//2] / jnp.sqrt(2))
+  DRT = jnp.zeros((n, n))
+  DRT = DRT.at[:,0].set(DRT_[:,0])
+  DRT = DRT.at[:,1::2].set(DRT_[:,1:n//2+1])
+  DRT = DRT.at[:,2::2].set(DRT_[:,n//2+1:])
+  return DRT
+
 
 class NonlinearGPDataset(Dataset):
   """Gaussian control for Nonlinear Gaussian Process dataset."""
@@ -57,19 +75,34 @@ class NonlinearGPDataset(Dataset):
 
     # self.exemplar_noise_scale = exemplar_noise_scale
     self.num_dimensions = num_dimensions 
+    self.DRT = build_DRT(num_dimensions)
 
     # Compile a function for sampling exemplars at `Dataset.__init__`.
     def Z(g):
-        return jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) ) )
+      return jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) ) )
     
-    # @profile
+    # old way, used prior to Nov 2, 2023
+    def generate_non_gaussian_old(key, xi, L, g):
+      C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
+      C = jnp.minimum(C, L - C)
+      C = jnp.exp(-C ** 2 / (xi ** 2))
+      z = jax.random.multivariate_normal(key, jnp.zeros(L), C, method="svd") # FIXME: using svd for numerical stability, breaks if xi > 2.5 ish
+      x = gain_function(g * z) / Z(g)
+      return x
+      
+    # new way, equivalent in distribution but lets us make more direct comparisons to Gaussian clone
+    # randomness will be different, so it may yield slightly different results than before
     def generate_non_gaussian(key, xi, L, g):
-        C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
-        C = jnp.minimum(C, L - C)
-        C = jnp.exp(-C ** 2 / (xi ** 2))
-        z = jax.random.multivariate_normal(key, jnp.zeros(L), C, method="svd") # FIXME: using svd for numerical stability, breaks if xi > 2.5 ish
-        x = gain_function(g * z) / Z(g)
-        return x
+      C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
+      C = jnp.minimum(C, L - C)
+      C = jnp.exp(-C ** 2 / (xi ** 2))
+      evals = jnp.diag(self.DRT.T @ C @ self.DRT)
+      sqrt_C = self.DRT @ jnp.diag(jnp.sqrt(evals)) @ self.DRT.T
+      
+      z_id = jax.random.normal(key, (L,))
+      z = sqrt_C @ z_id
+      x = gain_function(g * z) / Z(g)
+      return x
 
     # @profile
     def generate_non_gaussian_branching(key, class_proportion, L, g, xi1, xi2):
