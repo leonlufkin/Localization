@@ -158,7 +158,12 @@ def run(config, sweep_dict, gain):
 
     argmin, err = evaluate_sweep_(weights[-1,0], sweep)
     
-    return argmin, err
+    params = ['c', 'b', 'a', 'x0', 'k0']
+    out = np.zeros(len(params))
+    for i, param in enumerate(params):
+        out[i] = sweep_dict[param][argmin[i]]
+    
+    return out, argmin, err
     
 
 if __name__ == '__main__':
