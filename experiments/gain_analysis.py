@@ -257,8 +257,10 @@ if __name__ == '__main__':
         ),
     )
     
-    opt = np.stack([ j.result() for j in jobs ])
+    opt_params = np.stack([ j.result()[0] for j in jobs ])
+    errs = np.stack([ j.result()[2] for j in jobs ])
     print( opt.shape )
+    print( errs.shape )
     
     # opt = np.empty((len(GAIN_SWEEP), 5))
     # for r, argmin_ in enumerate(argmin):
