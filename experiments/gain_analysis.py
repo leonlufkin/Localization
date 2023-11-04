@@ -77,7 +77,7 @@ def load(**kwargs):
         raise ValueError('No simulation found')
     return weights_, metrics_
 
-def build_sweep(c, b, a, x0, k0, x, n):
+def build_sweep(c, b, a, x0, k0, x):
 
     datawd = '../localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/gain_sweep'
     
@@ -93,8 +93,8 @@ def build_sweep(c, b, a, x0, k0, x, n):
                         jax.vmap(
                             partial(
                                 gabor_real,
-                                x=jnp.arange(config_['num_dimensions']),
-                                n=config_['num_dimensions']
+                                x=x,
+                                n=len(x),
                             ),
                             in_axes=(None, None, None, None, 0),
                         ),
@@ -116,8 +116,8 @@ def build_sweep(c, b, a, x0, k0, x, n):
                         jax.vmap(
                             partial(
                                 gabor_imag,
-                                x=jnp.arange(config_['num_dimensions']),
-                                n=config_['num_dimensions']
+                                x=x,
+                                n=len(x),
                             ),
                             in_axes=(None, None, None, None, 0),
                         ),
@@ -148,7 +148,7 @@ def evaluate_sweep_(weight, sweep):
 
 def run(config, sweep_dict, gain):
     
-    sweep = build_sweep(**sweep_dict)
+    sweep = build_sweep(**sweep_dict, x=jnp.arange(config['num_dimensions']))
     
     config_ = config.copy()
     config_.update(dict(
