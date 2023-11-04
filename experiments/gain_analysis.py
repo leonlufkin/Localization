@@ -79,6 +79,8 @@ def load(**kwargs):
 
 def build_sweep(c, b, a, x0, k0, x):
 
+    n = len(x)
+
     datawd = '../localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/gain_sweep'
     
     if f'sweep_{n}.npy' in os.listdir(datawd):
@@ -94,7 +96,7 @@ def build_sweep(c, b, a, x0, k0, x):
                             partial(
                                 gabor_real,
                                 x=x,
-                                n=len(x),
+                                n=n,
                             ),
                             in_axes=(None, None, None, None, 0),
                         ),
@@ -117,7 +119,7 @@ def build_sweep(c, b, a, x0, k0, x):
                             partial(
                                 gabor_imag,
                                 x=x,
-                                n=len(x),
+                                n=n,
                             ),
                             in_axes=(None, None, None, None, 0),
                         ),
