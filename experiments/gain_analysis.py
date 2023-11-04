@@ -171,7 +171,7 @@ if __name__ == '__main__':
 
     executor = get_submitit_executor(
         timeout_min=60,
-        mem_gb=10,
+        mem_gb=20,
         # export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl"
         # NOTE: `log_dir` should be set to a directory shared across the head
         # (launching) node as well as compute nodes;
@@ -184,7 +184,7 @@ if __name__ == '__main__':
             get_timestamp(),
         ),
         # NOTE: Use `cluster="debug"` to simulate a SLURM launch locally.
-        cluster="debug",
+        cluster="slurm",
         # NOTE: This may be specific to your cluster configuration.
         # Run `sinfo -s` to get partition information.
         slurm_partition="cpu",
@@ -221,16 +221,16 @@ if __name__ == '__main__':
     )
     
     sweep_dict = dict(
-        c = jnp.linspace(-0.5, 0.5, 21),
-        b = jnp.concatenate([jnp.linspace(-0.5, 0.5, 20), jnp.array([0])]),
-        a = jnp.logspace(-0.5, 2, 50),
+        c = jnp.linspace(-0.5, 0.5, 51),
+        b = jnp.concatenate([jnp.linspace(-0.5, 0.5, 50), jnp.array([0])]),
+        a = jnp.logspace(-0.5, 2, 100),
         x0 = jnp.arange(0, config_['num_dimensions'], 0.5),
-        k0 = jnp.linspace(0.05, 0.15, 30),
+        k0 = jnp.linspace(0.05, 0.5, 100),
         x = jnp.arange(config_['num_dimensions']),
         n = config_['num_dimensions'],
     )
     
-    GAIN_SWEEP = jnp.array([0.01, 10.]) # jnp.logspace(-2, 1, 100)
+    GAIN_SWEEP = jnp.array([0.01])# , 10.]) # jnp.logspace(-2, 1, 100)
     
     # all_weights = np.empty((len(GAIN_SWEEP), config_['num_dimensions']))
     # for i, gain in enumerate(GAIN_SWEEP):
