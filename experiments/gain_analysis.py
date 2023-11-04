@@ -223,8 +223,8 @@ if __name__ == '__main__':
     )
     
     sweep_dict = dict(
-        c = jnp.linspace(-0.5, 0.5, 51),
-        b = jnp.concatenate([jnp.linspace(-0.5, 0.5, 50), jnp.array([0])]),
+        c = jnp.linspace(-0.5, 0.5, 30),
+        b = jnp.concatenate([jnp.linspace(-0.15, 0.15, 20), jnp.array([0])]),
         a = jnp.logspace(-0.5, 2, 100),
         x0 = jnp.arange(0, config_['num_dimensions'], 0.5),
         k0 = jnp.linspace(0.05, 0.5, 100),
