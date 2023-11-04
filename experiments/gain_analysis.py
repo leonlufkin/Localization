@@ -157,6 +157,7 @@ def run(config, sweep_dict, gain):
     weights, _ = load(**config_)
 
     argmin, err = evaluate_sweep_(weights[-1,0], sweep)
+    argmin = jnp.stack(argmin).flatten()
     
     params = ['c', 'b', 'a', 'x0', 'k0']
     out = np.zeros(len(params))
