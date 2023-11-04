@@ -252,28 +252,29 @@ if __name__ == '__main__':
     )
     
     print(jobs)
+    print(jobs[0].result())
     
-    opt = np.empty((len(GAIN_SWEEP), 5))
-    for r, argmin_ in enumerate(argmin):
-        print( argmin_ )
-        for i, arg in enumerate(argmin_):
-            opt[r,i] = locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg]
+    # opt = np.empty((len(GAIN_SWEEP), 5))
+    # for r, argmin_ in enumerate(argmin):
+    #     print( argmin_ )
+    #     for i, arg in enumerate(argmin_):
+    #         opt[r,i] = locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg]
             
-    # print( locals().keys() )
-    # opt = jnp.array([ [ locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg] for i, arg in enumerate(argmin_) ] for argmin_ in argmin ])
+    # # print( locals().keys() )
+    # # opt = jnp.array([ [ locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg] for i, arg in enumerate(argmin_) ] for argmin_ in argmin ])
             
-    # opt = jnp.array([[ locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg] for i, arg in enumerate(argmin_) ] for argmin_ in argmin])
-    # opt = jnp.array([[ locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg] for arg in param_argmin ] for i, param_argmin in enumerate(argmin) ])
-    print( opt )
+    # # opt = jnp.array([[ locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg] for i, arg in enumerate(argmin_) ] for argmin_ in argmin])
+    # # opt = jnp.array([[ locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg] for arg in param_argmin ] for i, param_argmin in enumerate(argmin) ])
+    # print( opt )
     
-    # # double check...
-    # pred = gabor_real(
-    #     c = c[argmin[0]],
-    #     b = b[argmin[1]],
-    #     a = a[argmin[2]],
-    #     x0 = x0[argmin[3]],
-    #     k0 = k0[argmin[4]],
-    #     x = jnp.arange(config_['num_dimensions']),
-    #     n = config_['num_dimensions'],
-    # )
-    # print( pred )
+    # # # double check...
+    # # pred = gabor_real(
+    # #     c = c[argmin[0]],
+    # #     b = b[argmin[1]],
+    # #     a = a[argmin[2]],
+    # #     x0 = x0[argmin[3]],
+    # #     k0 = k0[argmin[4]],
+    # #     x = jnp.arange(config_['num_dimensions']),
+    # #     n = config_['num_dimensions'],
+    # # )
+    # # print( pred )
