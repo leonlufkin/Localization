@@ -232,7 +232,7 @@ if __name__ == '__main__':
         # n = config_['num_dimensions'],
     )
     
-    GAIN_SWEEP = jnp.array([0.01, 10.]) # jnp.logspace(-2, 1, 100)
+    GAIN_SWEEP = jnp.array([0.01, 10.]) # jnp.logspace(-2, 1, 1000)
     
     # all_weights = np.empty((len(GAIN_SWEEP), config_['num_dimensions']))
     # for i, gain in enumerate(GAIN_SWEEP):
@@ -263,6 +263,10 @@ if __name__ == '__main__':
     errs = np.stack([ j.result()[2] for j in jobs ])
     print( opt_params.shape )
     print( errs.shape )
+    
+    datawd = '../localization/results/gain_analysis' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/gain_analysis'
+    np.save('../localization/results/gain_analysis/opt_params.npy', opt_params)
+    np.save('../localization/results/gain_analysis/errs.npy', errs)
     
     # opt = np.empty((len(GAIN_SWEEP), 5))
     # for r, argmin_ in enumerate(argmin):
