@@ -166,6 +166,10 @@ def run(config, sweep_dict, gain):
     for i, param in enumerate(params):
         out[i] = sweep_dict[param][argmin[i]]
     
+    datawd = '../localization/results/gain_analysis' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/gain_analysis'
+    np.save(datawd + f'/opt_params_{gain}.npy', out)
+    np.save(datawd + f'/errs_{gain}.npy', err)
+    
     return out, argmin, err
     
 
