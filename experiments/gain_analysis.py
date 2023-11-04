@@ -232,7 +232,7 @@ if __name__ == '__main__':
         # n = config_['num_dimensions'],
     )
     
-    GAIN_SWEEP = jnp.logspace(-2, 1, 1000)
+    GAIN_SWEEP = jnp.logspace(-2, 1, 100)
     
     # all_weights = np.empty((len(GAIN_SWEEP), config_['num_dimensions']))
     # for i, gain in enumerate(GAIN_SWEEP):
