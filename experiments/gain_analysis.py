@@ -173,7 +173,7 @@ if __name__ == '__main__':
 
     executor = get_submitit_executor(
         timeout_min=60,
-        mem_gb=20,
+        mem_gb=40,
         # export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl"
         # NOTE: `log_dir` should be set to a directory shared across the head
         # (launching) node as well as compute nodes;
