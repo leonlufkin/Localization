@@ -41,7 +41,7 @@ if __name__ == '__main__':
         # NOTE: This may be specific to your cluster configuration.
         # Run `sinfo -s` to get partition information.
         slurm_partition="cpu",
-        slurm_parallelism=30,
+        slurm_parallelism=200,
         gpus_per_node=0
     )
 
@@ -62,8 +62,8 @@ if __name__ == '__main__':
         init_fn=models.xavier_normal_init,
         init_scale=1.,
         # learning config
-        num_epochs=20000,
-        evaluation_interval=20,
+        num_epochs=5000,
+        evaluation_interval=10,
         optimizer_fn=optax.sgd,
         # experiment config
         seed=0,
@@ -78,7 +78,7 @@ if __name__ == '__main__':
             **tupify(config_),
             # NOTE: This is the only line that changes between experiments.
             gain=np.logspace(-2, 1, 100),
-            num_hiddens=(1,),
-            learning_rate=(0.01,),
+            num_hiddens=(40,),
+            learning_rate=(1.0,),
         ),
     )
