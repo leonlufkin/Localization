@@ -226,11 +226,11 @@ if __name__ == '__main__':
         a = jnp.logspace(-0.5, 2, 100),
         x0 = jnp.arange(0, config_['num_dimensions'], 0.5),
         k0 = jnp.linspace(0.05, 0.5, 100),
-        x = jnp.arange(config_['num_dimensions']),
-        n = config_['num_dimensions'],
+        # x = jnp.arange(config_['num_dimensions']),
+        # n = config_['num_dimensions'],
     )
     
-    GAIN_SWEEP = jnp.array([0.01])# , 10.]) # jnp.logspace(-2, 1, 100)
+    GAIN_SWEEP = jnp.array([0.01, 10.]) # jnp.logspace(-2, 1, 100)
     
     # all_weights = np.empty((len(GAIN_SWEEP), config_['num_dimensions']))
     # for i, gain in enumerate(GAIN_SWEEP):
