@@ -382,6 +382,35 @@ For $X \triangleq \operatorname{erf}(g Z)$,
   \E_{ X, \langle X, e_i \rangle > 0 \mid Y = 1 } \left[ \langle X, e_i \rangle \right] 
 \end{align}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Uncertainty Principle %%
+\subsection*{Uncertainty Principle}
+Sometimes, the receptive fields we get \emph{really} look like (the real part of) Gabors.
+This really seems to be the case when we have multiple hidden neurons and high gain.
+We can show that the receptive fields continuously deform from long-range oscillations to localized bumps as we increase the gain.
+If the receptive fields actually are Gabors, this could be explained by variations in the exponential decay and sinusoidal frequency terms in the Gabor's definition.
+\emph{A hypothesis I would like to test is that in both the Gaussian and non-Gaussian cases, the receptive fields are 1-d Gabor wavelets, differing only in the decay and frequency terms.}
+
+This would be a very strong result, and I am not sure how to prove it.
+One possible strategy is to connect this to the uncertainty principle.
+The idea would be to show that the receptive fields' uncertainties in position and frequency decrease during training to the theoretical minimum of $\frac{1}{2}$.
+Showing this minimum is attained seems quite challenging, but perhaps we can at least show that the uncertainty decreases monotonically.
+
+There are three immediate difficulties here.
+First, the signals can be complex-valued, while here we only wish to consider real-valued signals.
+(What is a complex-valued receptive field anyway?)
+So, we would need to figure out what the uncertainty principle looks like for real continuous signals, and hopefully then also discrete ones.
+Secondly, the uncertainty principle was established for the Fourier transform, not the discrete Fourier transform.
+That is, the inputs are continuous, not discrete.
+Finally, are receptive fields seem to be periodic, while the uncertainty principle is for non-periodic signals.
+I am not sure if it is actually true that our receptive fields are periodic, but it seems to me that an uncertainty-minimizing signal on the 1-d torus would look very different from that on the real line.
+I will try to address these three concerns in the following paragraphs.
+
+\paragraph*{The uncertainty principle}
+First, I introduce the classical uncertainty principle for complex-valued, continuous signals on the real line.
+
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Have You Tried Making It Linear? %%

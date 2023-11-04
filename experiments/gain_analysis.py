@@ -1,8 +1,7 @@
 import os
 import datetime
 # export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl" # <- this should allow us to import from submit.py
-from submit import get_submitit_executor, submit_jobs, product_kwargs
-from pathlib import Path
+# from pathlib import Path
 
 import numpy as np
 import jax
@@ -142,8 +141,9 @@ def build_sweep(c, b, a, x0, k0, x):
 
 def evaluate_sweep_(weight, sweep):
     w = weight.reshape(1, 1, 1, 1, 1, -1)
+    n = w.shape[-1]
     # err = jnp.abs(sweep - w).mean(axis=-1) # l-1 norm
-    err = ((sweep - w) ** 2).mean(axis=-1) ** (1/2) # l-2 norm
+    err = ((sweep - w) ** 2).sum(axis=-1) ** (1/2) / n # l-2 norm
     # err = jnp.abs(sweep - w).max(axis=-1) # l-infinity norm
     argmin = jnp.unravel_index(jnp.argmin(err), err.shape)
     return argmin, err[argmin]
@@ -175,29 +175,6 @@ def run(config, sweep_dict, gain):
 
 if __name__ == '__main__':
 
-    executor = get_submitit_executor(
-        timeout_min=60,
-        mem_gb=40,
-        # export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl"
-        # NOTE: `log_dir` should be set to a directory shared across the head
-        # (launching) node as well as compute nodes;
-        # can set `export RESULTS_HOME="..." external to Python or
-        # change the below.
-        log_dir=Path(
-            os.path.join(os.environ.get("LOGS_HOME"), "gain_analysis")
-            if os.environ.get("LOGS_HOME") is not None
-            else os.path.join("/tmp", os.environ.get("USER"), "gain_analysis"),
-            get_timestamp(),
-        ),
-        # NOTE: Use `cluster="debug"` to simulate a SLURM launch locally.
-        cluster="slurm",
-        # NOTE: This may be specific to your cluster configuration.
-        # Run `sinfo -s` to get partition information.
-        slurm_partition="cpu",
-        slurm_parallelism=200,
-        gpus_per_node=0
-    )
-
     config_ = dict(
         # data config
         num_dimensions=40,
@@ -226,73 +203,83 @@ if __name__ == '__main__':
         wandb_=False,
     )
     
+    
     sweep_dict = dict(
         c = jnp.linspace(-0.5, 0.5, 30),
         b = jnp.concatenate([jnp.linspace(-0.15, 0.15, 10), jnp.array([0])]),
         a = jnp.logspace(-0.5, 2, 50),
         x0 = jnp.arange(0, config_['num_dimensions'], 0.5),
         k0 = jnp.linspace(0.05, 0.5, 80),
-        # x = jnp.arange(config_['num_dimensions']),
-        # n = config_['num_dimensions'],
     )
     
     GAIN_SWEEP = jnp.logspace(-2, 1, 1000)
     
-    # all_weights = np.empty((len(GAIN_SWEEP), config_['num_dimensions']))
-    # for i, gain in enumerate(GAIN_SWEEP):
-    #     config = config_.copy()
-    #     config.update(dict(
-    #         gain = gain
-    #     ))
-    #     weights, _ = load(**config)
-    #     all_weights[i] = weights[-1,0]
+    if gethostname() == 'Leons-MBP':
     
-    # print( all_weights.shape )
-    # argmin, err = evaluate_sweep(all_weights)
-    # argmin = jnp.stack(argmin).T
-    # print( argmin )
-    # print( err )
+        # all_weights = np.empty((len(GAIN_SWEEP), config_['num_dimensions']))
+        # for i, gain in enumerate(GAIN_SWEEP):
+        #     config = config_.copy()
+        #     config.update(dict(
+        #         gain = gain
+        #     ))
+        #     weights, _ = load(**config)
+        #     all_weights[i] = weights[-1,0]
+        
+        opt = np.empty((len(GAIN_SWEEP), 5))
+        err = np.empty(len(GAIN_SWEEP))
+        for i, g in enumerate(GAIN_SWEEP):
+            try:
+                opt[i] = np.load(f'../results/cluster/gain_analysis/gain_analysis/opt_params_{g}.npy')
+                err[i] = np.load(f'../results/cluster/gain_analysis/gain_analysis/errs_{g}.npy')
+            except:
+                print(f'Failed to load {g}')
+                opt[i] = err[i] = np.nan
+        
+        np.save('../results/cluster/gain_analysis/opt_params.npy', opt)
+        np.save('../results/cluster/gain_analysis/errs.npy', err)
+        
+    else:
+        from submit import get_submitit_executor, submit_jobs, product_kwargs
     
-    jobs = submit_jobs(
-        executor=executor,
-        func=run,
-        kwargs_array=product_kwargs(
-            config=(config_,),
-            sweep_dict=(sweep_dict,),
-            gain=GAIN_SWEEP,
-        ),
-    )
-    
-    opt_params = np.stack([ j.result()[0] for j in jobs ])
-    errs = np.stack([ j.result()[2] for j in jobs ])
-    print( opt_params.shape )
-    print( errs.shape )
-    
-    datawd = '../localization/results/gain_analysis' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/gain_analysis'
-    np.save(datawd + '/opt_params.npy', opt_params)
-    np.save(datawd + '/errs.npy', errs)
-    
-    # opt = np.empty((len(GAIN_SWEEP), 5))
-    # for r, argmin_ in enumerate(argmin):
-    #     print( argmin_ )
-    #     for i, arg in enumerate(argmin_):
-    #         opt[r,i] = locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg]
-            
-    # # print( locals().keys() )
-    # # opt = jnp.array([ [ locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg] for i, arg in enumerate(argmin_) ] for argmin_ in argmin ])
-            
-    # # opt = jnp.array([[ locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg] for i, arg in enumerate(argmin_) ] for argmin_ in argmin])
-    # # opt = jnp.array([[ locals()[['c', 'b', 'a', 'x0', 'k0'][i]][arg] for arg in param_argmin ] for i, param_argmin in enumerate(argmin) ])
-    # print( opt )
-    
-    # # # double check...
-    # # pred = gabor_real(
-    # #     c = c[argmin[0]],
-    # #     b = b[argmin[1]],
-    # #     a = a[argmin[2]],
-    # #     x0 = x0[argmin[3]],
-    # #     k0 = k0[argmin[4]],
-    # #     x = jnp.arange(config_['num_dimensions']),
-    # #     n = config_['num_dimensions'],
-    # # )
-    # # print( pred )
+        executor = get_submitit_executor(
+            timeout_min=60,
+            mem_gb=40,
+            # export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl"
+            # NOTE: `log_dir` should be set to a directory shared across the head
+            # (launching) node as well as compute nodes;
+            # can set `export RESULTS_HOME="..." external to Python or
+            # change the below.
+            log_dir=Path(
+                os.path.join(os.environ.get("LOGS_HOME"), "gain_analysis")
+                if os.environ.get("LOGS_HOME") is not None
+                else os.path.join("/tmp", os.environ.get("USER"), "gain_analysis"),
+                get_timestamp(),
+            ),
+            # NOTE: Use `cluster="debug"` to simulate a SLURM launch locally.
+            cluster="slurm",
+            # NOTE: This may be specific to your cluster configuration.
+            # Run `sinfo -s` to get partition information.
+            slurm_partition="cpu",
+            slurm_parallelism=200,
+            gpus_per_node=0
+        )
+        
+        
+        jobs = submit_jobs(
+            executor=executor,
+            func=run,
+            kwargs_array=product_kwargs(
+                config=(config_,),
+                sweep_dict=(sweep_dict,),
+                gain=GAIN_SWEEP,
+            ),
+        )
+        
+        opt_params = np.stack([ j.result()[0] for j in jobs ])
+        errs = np.stack([ j.result()[2] for j in jobs ])
+        print( opt_params.shape )
+        print( errs.shape )
+        
+        datawd = '../localization/results/gain_analysis' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/gain_analysis'
+        np.save(datawd + '/opt_params.npy', opt_params)
+        np.save(datawd + '/errs.npy', errs)
