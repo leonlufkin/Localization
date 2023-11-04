@@ -69,7 +69,7 @@ def gabor_imag(c, b, a, x0, k0, x, n):
 
 def load(**kwargs):
     path_key = make_key(**kwargs)
-    datawd = '/ceph/scratch/leonl/results/gain_sweep' if gethostname().startswith('hpc') else '../localization/results/weights'
+    datawd = '../localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/gain_sweep'
     if path_key + '.npz' in os.listdir(datawd):
         data = np.load(datawd + '/' + path_key + '.npz', allow_pickle=True)
         weights_, metrics_ = data['weights'], data['metrics']
@@ -79,7 +79,7 @@ def load(**kwargs):
 
 def build_sweep(c, b, a, x0, k0, x, n):
 
-    datawd = '/ceph/scratch/leonl/results/gain_sweep' if gethostname().startswith('hpc') else '../localization/results/weights'
+    datawd = '../localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/gain_sweep'
     
     if f'sweep_{n}.npy' in os.listdir(datawd):
         sweep = np.load(datawd + f'/sweep_{n}.npy')
