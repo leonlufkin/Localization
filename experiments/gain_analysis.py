@@ -265,8 +265,8 @@ if __name__ == '__main__':
     print( errs.shape )
     
     datawd = '../localization/results/gain_analysis' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/gain_analysis'
-    np.save('../localization/results/gain_analysis/opt_params.npy', opt_params)
-    np.save('../localization/results/gain_analysis/errs.npy', errs)
+    np.save(datawd + '/opt_params.npy', opt_params)
+    np.save(datawd + '/errs.npy', errs)
     
     # opt = np.empty((len(GAIN_SWEEP), 5))
     # for r, argmin_ in enumerate(argmin):
