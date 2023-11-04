@@ -259,7 +259,7 @@ if __name__ == '__main__':
     
     opt_params = np.stack([ j.result()[0] for j in jobs ])
     errs = np.stack([ j.result()[2] for j in jobs ])
-    print( opt.shape )
+    print( opt_params.shape )
     print( errs.shape )
     
     # opt = np.empty((len(GAIN_SWEEP), 5))
