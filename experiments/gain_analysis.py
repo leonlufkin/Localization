@@ -218,10 +218,10 @@ if __name__ == '__main__':
         c = jnp.linspace(-0.5, 0.5, 21),
         b = jnp.concatenate([jnp.linspace(-0.5, 0.5, 20), jnp.array([0])]),
         a = jnp.logspace(-0.5, 2, 50),
-        x0 = jnp.arange(0, config['num_dimensions'], 0.5),
+        x0 = jnp.arange(0, config_['num_dimensions'], 0.5),
         k0 = jnp.linspace(0.05, 0.15, 30),
-        x = jnp.arange(config['num_dimensions']),
-        n = config['num_dimensions'],
+        x = jnp.arange(config_['num_dimensions']),
+        n = config_['num_dimensions'],
     )
     
     GAIN_SWEEP = jnp.array([0.01, 10.]) # jnp.logspace(-2, 1, 100)
@@ -245,11 +245,13 @@ if __name__ == '__main__':
         executor=executor,
         func=run,
         kwargs_array=product_kwargs(
-            **tupify(config_),
-            # NOTE: This is the only line that changes between experiments.
+            config=(config_,),
+            sweep_dict=(sweep_dict,),
             gain=GAIN_SWEEP,
         ),
     )
+    
+    print(jobs)
     
     opt = np.empty((len(GAIN_SWEEP), 5))
     for r, argmin_ in enumerate(argmin):
