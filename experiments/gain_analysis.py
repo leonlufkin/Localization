@@ -257,9 +257,8 @@ if __name__ == '__main__':
         ),
     )
     
-    print(jobs)
-    print(jobs[0].result())
-    print(jobs.result())
+    opt = np.stack([ j.result() for j in jobs ])
+    print( opt.shape )
     
     # opt = np.empty((len(GAIN_SWEEP), 5))
     # for r, argmin_ in enumerate(argmin):
