@@ -190,7 +190,7 @@ if __name__ == '__main__':
         # NOTE: This may be specific to your cluster configuration.
         # Run `sinfo -s` to get partition information.
         slurm_partition="cpu",
-        slurm_parallelism=30,
+        slurm_parallelism=200,
         gpus_per_node=0
     )
 
@@ -224,10 +224,10 @@ if __name__ == '__main__':
     
     sweep_dict = dict(
         c = jnp.linspace(-0.5, 0.5, 30),
-        b = jnp.concatenate([jnp.linspace(-0.15, 0.15, 20), jnp.array([0])]),
-        a = jnp.logspace(-0.5, 2, 100),
+        b = jnp.concatenate([jnp.linspace(-0.15, 0.15, 10), jnp.array([0])]),
+        a = jnp.logspace(-0.5, 2, 50),
         x0 = jnp.arange(0, config_['num_dimensions'], 0.5),
-        k0 = jnp.linspace(0.05, 0.5, 100),
+        k0 = jnp.linspace(0.05, 0.5, 80),
         # x = jnp.arange(config_['num_dimensions']),
         # n = config_['num_dimensions'],
     )
