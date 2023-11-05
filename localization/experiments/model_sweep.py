@@ -55,7 +55,7 @@ if __name__ == '__main__':
         # model config
         model_cls=models.SimpleNet,
         # num_hiddens=1,
-        num_hiddens=40,
+        num_hiddens=1,
         # activation='relu',
         activation='sigmoid',
         use_bias=True,
@@ -67,7 +67,9 @@ if __name__ == '__main__':
         evaluation_interval=10,
         optimizer_fn=optax.sgd,
         # learning_rate=1.0,
-        learning_rate=20.0,
+        # learning_rate=0.025,
+        # learning_rate=20.0,
+        learning_rate=0.5,
         # experiment config
         seed=0,
         save_=True,
