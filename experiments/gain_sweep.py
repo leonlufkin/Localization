@@ -56,8 +56,8 @@ if __name__ == '__main__':
         class_proportion=0.5,
         # model config
         model_cls=models.SimpleNet,
-        activation='relu',
-        use_bias=False,
+        activation='sigmoid',
+        use_bias=True,
         sampler_cls=samplers.EpochSampler,
         init_fn=models.xavier_normal_init,
         init_scale=1.,
@@ -79,6 +79,6 @@ if __name__ == '__main__':
             # NOTE: This is the only line that changes between experiments.
             gain=np.logspace(-2, 1, 100),
             num_hiddens=(40,),
-            learning_rate=(1.0,),
+            learning_rate=(20.0,),
         ),
     )
