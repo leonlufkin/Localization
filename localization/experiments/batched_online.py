@@ -167,7 +167,7 @@ def make_key(dataset_cls, support, xi1, xi2, class_proportion, batch_size, num_e
   dataset_name = dataset_cls.__name__
   model_name = model_cls.__name__
   return f'{dataset_name}{interval_to_str(support)}_xi1={interval_to_str(xi1)}_xi2={interval_to_str(xi2)}'\
-    f'{f"_gain={gain:.3f}" if "Nonlinear" in dataset_name else ""}_p={class_proportion:.2f}'\
+    f'{f"_gain={gain:.3f}" if gain is not None else ""}_p={class_proportion:.2f}'\
     f'_batch_size={batch_size}_num_epochs={num_epochs}'\
     f'_loss=mse_lr={learning_rate:.3f}'\
     f'_{model_name}{"" if use_bias else "nobias"}_L={num_dimensions:03d}_K={num_hiddens:03d}_activation={activation.__name__ if isinstance(activation, Callable) else activation}'\
