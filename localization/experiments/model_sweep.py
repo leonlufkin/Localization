@@ -66,8 +66,8 @@ if __name__ == '__main__':
         num_epochs=5000,
         evaluation_interval=10,
         optimizer_fn=optax.sgd,
-        learning_rate=1.0,
-        # learning_rate=20.0,
+        # learning_rate=1.0,
+        learning_rate=20.0,
         # experiment config
         seed=0,
         save_=True,
