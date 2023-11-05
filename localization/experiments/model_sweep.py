@@ -56,9 +56,9 @@ if __name__ == '__main__':
         model_cls=models.SimpleNet,
         # num_hiddens=1,
         num_hiddens=1,
-        # activation='relu',
-        activation='sigmoid',
-        use_bias=True,
+        activation='relu',
+        # activation='sigmoid',
+        # use_bias=True,
         sampler_cls=samplers.EpochSampler,
         init_fn=models.xavier_normal_init,
         init_scale=1.,
@@ -67,9 +67,9 @@ if __name__ == '__main__':
         evaluation_interval=10,
         optimizer_fn=optax.sgd,
         # learning_rate=1.0,
-        # learning_rate=0.025,
+        learning_rate=0.025,
         # learning_rate=20.0,
-        learning_rate=0.5,
+        # learning_rate=0.5,
         # experiment config
         seed=0,
         save_=True,
@@ -85,5 +85,6 @@ if __name__ == '__main__':
             # These are the settings we're sweeping over
             gain=np.linspace(0.01, 5, 10),
             dataset_cls=(datasets.NonlinearGPDataset, datasets.NLGPGaussianCloneDataset,),
+            use_bias=(True, False,),
         ),
     )
