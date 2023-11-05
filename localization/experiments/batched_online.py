@@ -291,10 +291,6 @@ def simulate(
     init_fn=init_fn
   )
   
-  # path_key = make_key(dataset_cls, xi1, xi2, gain=gain, class_proportion=class_proportion,
-  #                     batch_size=batch_size, num_epochs=num_epochs, learning_rate=learning_rate, 
-  #                     model_cls=model_cls, use_bias=use_bias, num_dimensions=num_dimensions, num_hiddens=num_hiddens, 
-  #                     activation=activation, init_scale=init_scale, init_fn=init_fn)
   path_key = make_key(**config)
 
   #########
@@ -403,6 +399,10 @@ def simulate(
   # Bookkeeping.
   metrics = []
   itercount = itertools.count()
+  
+  # Save weights before starting training.
+  weights = []
+  weights.append(model.fc1.weight)
 
   # Evaluate before starting training.
   metrics_ = evaluate(
@@ -426,23 +426,8 @@ def simulate(
   print("\nStarting training...")
   
   start_time = time.time()
-      
-#   def save_model_weights(train_step_num):
-#     # save model weights
-#     if gethostname() == 'Leons-MBP': 
-#       jnp.save(f"results/weights/{path_key}/fc1_{train_step_num}.npy", model.fc1.weight)
-#     else:
-#       os.makedirs(f"/tmp/weights/", exist_ok=True)
-#       jnp.save(f"/tmp/weights/fc1_{train_step_num}.npy", model.fc1.weight)
-#     print(f"Saved model weights at iteration {train_step_num}.")
-  
-  weights = [] # just for local runs
-  weights.append(model.fc1.weight) #if gethostname() == 'Leons-MBP' else save_model_weights(train_step_num=0)
   
   for epoch, (x, y) in enumerate(batcher(train_sampler, batch_size)):
-    # print(f"mean(y) = {jnp.mean(y)}")
-    # print(x)
-    # print(y)
     (train_key,) = jax.random.split(train_key, 1)
     train_step_num = int(next(itercount))
     train_loss, model, opt_state = train_step(
@@ -464,28 +449,46 @@ def simulate(
       
       log_to_wandb(metrics_) if wandb_ else metrics.append(metrics_)
       
-      weights.append(model.fc1.weight) #if gethostname() == 'Leons-MBP' else save_model_weights(train_step_num=train_step_num)
+      weights.append(model.fc1.weight)
       
       start_time = time.time()
 
+  # wrapping up
   print("Training finished.")
-  try:
-    wandb.finish(quiet=True)
-  except:
-    print("wandb.finish() failed")
+  if wandb_:
+    try:
+      wandb.finish(quiet=True)
+    except:
+      print("wandb.finish() failed")
 
-  # combine all weights in /tmp/weights/
-#   if gethostname() != 'Leons-MBP':
-#     weights = [ np.load(f"'/tmp/weights/fc1_{train_step_num}.npy") for train_step_num in range(0, num_epochs+1, evaluation_interval) ]
+  # compiling weights and metrics
   weights = np.stack(weights, axis=0)
-  df = pd.DataFrame(metrics)
-  df['epoch'] = np.minimum(df.index * evaluation_interval, num_epochs)
+  metrics = pd.DataFrame(metrics)
+  metrics['epoch'] = np.minimum(metrics.index * evaluation_interval, num_epochs)
+  metrics = metrics.to_numpy()[:,:-1]
   if save_:
-    dir_ = "/Users/leonlufkin/Documents/GitHub/Localization/localization/results/weights" if gethostname() == 'Leons-MBP' else "/ceph/scratch/leonl/results/gain_sweep"
-    # os.makedirs(f"results/weights/", exist_ok=True)
-    np.savez(f"{dir_}/{path_key}.npz", weights=weights, metrics=df.to_numpy()[:,:-1])
+    weightwd = '../localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/weights'
+    np.savez(f"{weightwd}/{path_key}.npz", weights=weights, metrics=metrics)
 
-  return weights, df
+  return weights, metrics
+
+def load(**kwargs):
+  path_key = make_key(**kwargs)
+  weightwd = '../localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/weights'
+  if path_key + '.npz' in os.listdir(weightwd):
+    print('Already simulated')
+    data = np.load(weightwd + '/' + path_key + '.npz', allow_pickle=True)
+    return data['weights'], data['metrics']
+  
+  raise ValueError('No such file')
+
+def simulate_or_load(**kwargs):
+  try:
+    weights_, metrics_ = load(**kwargs)
+  except:
+    print('Simulating')
+    weights_, metrics_ = simulate(**kwargs)
+  return weights_, metrics_
 
 if __name__ == '__main__':
 
