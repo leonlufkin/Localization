@@ -4,11 +4,11 @@ import numpy as np
 import optax
 from localization import datasets, models, samplers
 from localization.experiments import simulate
-from localization.utils import get_executor, tupify
-from submit import submit_jobs, product_kwargs
-
 
 if __name__ == '__main__':
+    
+    from localization.utils.launcher import get_executor, tupify
+    from submit import submit_jobs, product_kwargs
 
     executor = get_executor(
         job_name="model_sweep",
@@ -54,11 +54,6 @@ if __name__ == '__main__':
         class_proportion=0.5,
         # model config
         model_cls=models.SimpleNet,
-        # num_hiddens=1,
-        num_hiddens=1,
-        activation='relu',
-        # activation='sigmoid',
-        # use_bias=True,
         sampler_cls=samplers.EpochSampler,
         init_fn=models.xavier_normal_init,
         init_scale=1.,
@@ -66,25 +61,47 @@ if __name__ == '__main__':
         num_epochs=5000,
         evaluation_interval=10,
         optimizer_fn=optax.sgd,
-        # learning_rate=1.0,
-        learning_rate=0.025,
-        # learning_rate=20.0,
-        # learning_rate=0.5,
         # experiment config
         seed=0,
         save_=True,
         wandb_=False,
     )
+    
+    # helper function to only sweep across subset of hyperparameters
+    def simulate_(**kwargs):
+        activation = kwargs['activation']
+        num_hiddens = kwargs['num_hiddens']
+        learning_rate = kwargs['learning_rate']
+        use_bias = kwargs['use_bias']
+        
+        if activation == 'relu':
+            if num_hiddens == 40 and learning_rate != 1.0:
+                return
+            if num_hiddens == 1 and learning_rate != 0.025:
+                return
+            
+        if activation == 'sigmoid':
+            if not use_bias:
+                return
+            if num_hiddens == 40 and learning_rate != 20.0:
+                return
+            if num_hiddens == 1 and learning_rate != 0.5:
+                return
+            
+        return simulate(**kwargs)
 
     ## Submit jobs
     jobs = submit_jobs(
         executor=executor,
-        func=simulate,
+        func=simulate_,
         kwargs_array=product_kwargs(
             **tupify(config_),
             # These are the settings we're sweeping over
-            gain=np.linspace(0.01, 5, 10),
             dataset_cls=(datasets.NonlinearGPDataset, datasets.NLGPGaussianCloneDataset,),
+            num_hiddens=(1, 40,),
+            activation=('relu', 'sigmoid',),
             use_bias=(True, False,),
+            learning_rate=(1.0, 0.025, 20.0, 0.5,),
+            gain=np.linspace(0.01, 5, 10),
         ),
     )

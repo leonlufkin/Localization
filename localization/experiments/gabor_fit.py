@@ -9,8 +9,7 @@ from functools import partial
 import optax
 from localization import datasets, models, samplers
 from localization.experiments.batched_online import simulate, load, make_key
-from localization.utils import get_executor, tupify, gabor_real, gabor_imag
-from submit import submit_jobs, product_kwargs
+from localization.utils.modeling import gabor_real, gabor_imag
 
 from socket import gethostname
 
@@ -89,6 +88,9 @@ def find_gabor_fit(sweep_dict, **config):
     
 
 if __name__ == '__main__':
+    
+    from localization.utils.launcher import get_executor, tupify
+    from submit import submit_jobs, product_kwargs
 
     ## Define base config
     config_ = dict(
