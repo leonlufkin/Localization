@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import optax
 from localization import datasets, models, samplers
 from localization.experiments import load, make_key
-from localization.utils import get_executor, tupify
+from localization.utils.launcher import get_executor, tupify
 from submit import submit_jobs, product_kwargs
 
 def track_top_n_overlap(argsort, n=5):
