@@ -46,7 +46,7 @@ def track_peaks(n=5, **config):
     overlap, single = track_weights(weights_nlgp, n=n)
 
     # plot results
-    fig, ((ax1, ax2, ax_), (ax3, ax4, ax5)) = plt.subplots(2, 3, figsize=(10, 10))
+    fig, ((ax1, ax2, ax_), (ax3, ax4, ax5)) = plt.subplots(2, 3, figsize=(16, 10))
     epochs_nlgp, epochs_gauss = metrics_nlgp[:,0], metrics_gauss[:,0]
     # plot losses
     ax1.plot(epochs_nlgp, metrics_nlgp[:,1], label='NLGP')
@@ -66,15 +66,13 @@ def track_peaks(n=5, **config):
     ax3.plot(epochs_nlgp, err)
     ax3.set_title('Error')
     # plot peak tracking, overlap
-    ax4.plot(epochs_nlgp, overlap, label=f'Overlap among top {n}')
+    ax4.plot(epochs_nlgp, overlap)
     ax4.set_xscale('log')
-    ax4.set_title('Peak tracking')
-    ax4.legend()
+    ax4.set_title(f'Overlap among top {n}')
     # plot peak tracking, single
-    ax5.plot(epochs_nlgp, single, label=f'Final peak in top {n}')
+    ax5.plot(epochs_nlgp, single)
     ax5.set_xscale('log')
-    ax5.set_title('Peak tracking')
-    ax5.legend()
+    ax5.set_title(f'Final peak in top {n}')
     
     # save results
     path_key = make_key(**config, dataset_cls=datasets.NonlinearGPDataset)
