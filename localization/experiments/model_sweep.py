@@ -16,7 +16,7 @@ if __name__ == '__main__':
         partition="cpu",
         timeout_min=60,
         mem_gb=10,
-        parallelism=200,
+        parallelism=30,
         gpus_per_node=0,
     )
     
