@@ -80,9 +80,9 @@ if __name__ == '__main__':
         job_name="model_sweep",
         cluster="slurm",
         partition="cpu",
-        timeout_min=60,
-        mem_gb=10,
-        parallelism=200,
+        timeout_min=5,
+        mem_gb=5,
+        parallelism=40,
         gpus_per_node=0,
     )
 
