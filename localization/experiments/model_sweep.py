@@ -3,7 +3,7 @@
 import numpy as np
 import optax
 from localization import datasets, models, samplers
-from localization.experiments import simulate
+from localization.experiments import simulate, simulate_or_load
 
 if __name__ == '__main__':
     
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     )
     
     # helper function to only sweep across subset of hyperparameters
-    def simulate_(**kwargs):
+    def filter(**kwargs):
         activation = kwargs['activation']
         num_hiddens = kwargs['num_hiddens']
         learning_rate = kwargs['learning_rate']
@@ -88,12 +88,12 @@ if __name__ == '__main__':
             if num_hiddens == 1 and learning_rate != 0.5:
                 return
             
-        return simulate(**kwargs)
+        return simulate_or_load(**kwargs)
 
     ## Submit jobs
     jobs = submit_jobs(
         executor=executor,
-        func=simulate_,
+        func=filter,
         kwargs_array=product_kwargs(
             **tupify(config_),
             # These are the settings we're sweeping over
