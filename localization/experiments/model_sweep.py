@@ -88,6 +88,8 @@ if __name__ == '__main__':
             if num_hiddens == 1 and learning_rate != 0.5:
                 return
             
+        # NOTE: using `simulate_or_load` will effectively skip jobs that have already been run
+        #       if one needs to re-run jobs (specifically when using a new evaluation_interval), use `simulate` instead
         return simulate_or_load(**kwargs)
 
     ## Submit jobs

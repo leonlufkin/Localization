@@ -161,6 +161,14 @@ In toto,
   \end{multlined}
 \end{align}
 
+Thus, the full update is given by
+\begin{align*}
+  \tau \frac{d}{dt} w_1
+  &= \frac{1}{2} 
+\end{align*}
+
+
+
 \paragraph*{A single neuron}
 Let's consider what happens if we have just one hidden neuron, i.e. $K=1$.
 Then, the above analysis simplifies greatly.
@@ -408,6 +416,110 @@ I will try to address these three concerns in the following paragraphs.
 
 \paragraph*{The uncertainty principle}
 First, I introduce the classical uncertainty principle for complex-valued, continuous signals on the real line.
+
+
+%%%%%%%%%%%%%%%%%%%%%%
+%% Sigmoid Analysis %%
+%%%%%%%%%%%%%%%%%%%%%%
+\section{Sigmoid Analysis}
+Now, we'll try to analyze a network with a sigmoid activation.
+We will consider $\sigma(x) = \operatorname{erf}(\frac{x}{\sqrt{2}})$ for analytical convenience.
+Importantly, for sigmoid activation, we \emph{need} a learnable bias term.
+This makes sense intuitively because sigmoid has a symmetry about 0, saturates at $\pm \infty$, and must be invariant to sign flips of its input.
+But, of course, we'd like to characterize this.
+
+First, let's try to explain why we get \emph{two} populations of neurons when we use a sigmoid activation.
+Experimentally, it seems like this has to do with having a receptive field initialization that is more positive, but I'm not certain this fully explains it.
+Localized neurons always have negative bias terms, while oscillatory neurons have positive ones.
+Interestingly, if I adjust the initialization of the receptive fields to contain mostly positive values, I get mostly localized neurons.
+
+I will begin by seeing how weight initialization affects the bias terms.
+I begin by considering a single neuron.
+
+\subsection*{Single Neuron}
+Our prediction model is
+\begin{align}
+  \hat{y}(x) &= \sigma( \langle w_1, x \rangle + b_1 ).  
+\end{align}
+
+\paragraph*{Bias term}
+The (full-batch) gradient flow to the bias term is
+\begin{align}
+  \tau \frac{d}{d t} b_1 
+  &= \frac{1}{2} \E_{X \mid Y=1} \left[ \frac{2}{\sqrt{\pi}} e^{-( \langle w_1, X \rangle + b_1 )^2 } \right]
+  - \E_{X,Y} \left[ \operatorname{erf}( \langle w_1, X \rangle + b_1 ) \frac{2}{\sqrt{\pi}} e^{-( \langle w_1, X \rangle + b_1 )^2 } \right].
+\end{align}
+Let us define $\sigma_{1}^2 = w_1^\top \Sigma_1 w_1$ and $\sigma_{0}^2 = w_1^\top \Sigma_0 w_1$.
+The first term evaluates to:
+\begin{align}
+  \E_{X \mid Y=1} \left[ \frac{2}{\sqrt{\pi}} e^{-( \langle w_1, X \rangle + b_1 )^2 } \right] 
+  &= \frac{2}{\sqrt{\pi}}\cdot\frac{1}{\sqrt{2\sigma_{1}^{2}+1}}\exp\left(\frac{b_{1}^{2}}{2\sigma_{1}^{2}}\left(\frac{1}{2\sigma_{1}^{2}+1}-1\right)\right).
+\end{align}
+
+We split up the second term by conditioning on $Y=1$ and $Y=0$ separately, since the resulting expressions will have the same form.
+The former is:
+\begin{align}
+  &\E_{X \mid Y=1} \left[ \operatorname{erf}( \langle w_1, X \rangle + b_1 ) \frac{2}{\sqrt{\pi}} e^{-( \langle w_1, X \rangle + b_1 )^2 } \right] \\
+  &= -\frac{2}{\sqrt{\pi}\cdot\sqrt{2\sigma_{1}^{2}+1}}\exp\left(\left(\frac{2\sigma_{1}^{2}}{2\sigma_{1}^{2}+1}-1\right)b_{1}^{2}\right)\operatorname{erf}\left(\frac{\frac{2\sigma_{1}^{2}}{2\sigma_{1}^{2}+1}-1}{\sqrt{1+\frac{2\sigma_{1}^{2}}{2\sigma_{1}^{2}+1}}}b_{1}\right).
+\end{align}
+
+Putting this all together, the update to the bias term is
+\begin{align}
+  &\begin{multlined}
+    \tau \frac{d}{d t} b_1 = \frac{1}{\sqrt{\pi}\cdot\sqrt{2\sigma_{1}^{2}+1}}\left(e^{\frac{1}{2\sigma_{1}^{2}}\left(\frac{1}{2\sigma_{1}^{2}+1}-1\right)b_{1}^{2}}+e^{\left(\frac{2\sigma_{1}^{2}}{2\sigma_{1}^{2}+1}-1\right)b_{1}^{2}}\operatorname{erf}\left(\frac{\frac{2\sigma_{1}^{2}}{2\sigma_{1}^{2}+1}-1}{\sqrt{1+\frac{2\sigma_{1}^{2}}{2\sigma_{1}^{2}+1}}}b_{1}\right)+ \right. \\
+    \left. \sqrt{\frac{2\sigma_{1}^{2}+1}{2\sigma_{0}^{2}+1}}e^{\left(\frac{2\sigma_{0}^{2}}{2\sigma_{0}^{2}+1}-1\right)b_{1}^{2}}\operatorname{erf}\left(\frac{\frac{2\sigma_{0}^{2}}{2\sigma_{0}^{2}+1}-1}{\sqrt{1+\frac{2\sigma_{0}^{2}}{2\sigma_{0}^{2}+1}}}b_{1}\right)\right)
+  \end{multlined}
+\end{align}
+At initialization, this simplifies to
+\begin{align}
+  \tau \left. \frac{d}{d t} b_1 \right|_{t=0} &= \frac{1}{\sqrt{\pi}\cdot\sqrt{2\sigma_{1}^{2}(0)+1}}.
+\end{align}
+
+NOTE: analyzing the bias term may not be sufficient.
+I might have to look at the evolution of the receptive field too.
+
+\paragraph*{Receptive field}
+
+
+\subsection*{Multiple Neurons}
+Now, we'll consider a network with multiple hidden neurons.
+Our prediction model is
+\begin{align*}
+  \hat{y}(x) &= \frac{1}{K} \sum_{k \in [K]} \sigma( \langle w_k, x \rangle + b_k ).
+\end{align*}
+
+\paragraph*{Bias term}
+The gradient flow to the bias term is
+\begin{align*}
+  \tau \frac{d}{d t} b_1
+  &= \sqrt{\frac{2}{\pi}} \E_{X,Y} \left[ Y e^{-\frac{1}{2} ( \langle w_1, X \rangle + b_1 )^2 } \right]
+  - \frac{1}{K} \sqrt{\frac{2}{\pi}} \sum_{k\in[K]} \E_{X,Y} \left[ \sigma( \langle w_k, X \rangle + b_k ) e^{-\frac{1}{2} ( \langle w_1, X \rangle + b_1 )^2} \right].
+\end{align*}
+Again, we'll need to introduce some simplifying notation:
+\begin{align*}
+  \sigma_{ij} &\triangleq w_i^\top \Sigma_1 w_j \\
+  \tau_{ij} &\triangleq w_i^\top \Sigma_0 w_j.
+\end{align*}
+(Note that here, the negative class has label -1, not 0.
+Nevertheless, I still use $\Sigma_0$ to denote the covariance matrix of this class.)
+Then,
+\begin{align*}
+  K \tau \frac{d}{d t} b_1
+  &= \sqrt{\frac{2}{\pi}} \left( \frac{\mathrm{e}^{-\frac{b_1^2}{2({\sigma}_{11}+1)}}}{\sqrt{{\sigma}_{11}+1}} - \frac{\mathrm{e}^{-\frac{b_1^2}{2({\tau}_{11}+1)}}}{\sqrt{{\tau}_{11}+1}} \right) \\
+  & -\frac{1}{2K} \left[ \frac{e^{-\frac{1}{2}\left(1-\frac{\sigma_{11}}{\sigma_{11}+1}\right)b_{1}^{2}}}{\sqrt{\sigma_{11}+1}}\operatorname{erf}\left(\frac{1}{\sqrt{2}}\frac{\left(1-\frac{\sigma_{11}}{\sigma_{11}+1}\right)b_{1}}{\sqrt{1+\frac{\sigma_{11}}{\sigma_{11}+1}}}\right) + \frac{e^{-\frac{1}{2}\left(1-\frac{\tau_{11}}{\tau_{11}+1}\right)b_{1}^{2}}}{\sqrt{\tau_{11}+1}}\operatorname{erf}\left(\frac{1}{\sqrt{2}}\frac{\left(1-\frac{\tau_{11}}{\tau_{11}+1}\right)b_{1}}{\sqrt{1+\frac{\tau_{11}}{\tau_{11}+1}}}\right) \right] \\
+  & -\frac{1}{2K} \sqrt{\frac{2}{\pi}} \sum_{k>1} \frac{1}{\sqrt{\sigma_{11}+1}}e^{-\frac{1}{2\left(\sigma_{11}+1\right)}b_{1}^{2}}\operatorname{erf}\left(\frac{1}{\sqrt{2}\sqrt{1+\left(\sigma_{kk}-\frac{\sigma_{1k}^{2}}{\sigma_{11}}\right)}}\cdot\frac{-\frac{\sigma_{1k}}{\sigma_{11}}\frac{b_{1}}{\sigma_{11}+1}+b_{k}}{\sqrt{1+\frac{\sigma_{1k}^{2}}{\sigma_{11}+\left(\sigma_{11}\sigma_{kk}-\sigma_{1k}^{2}\right)}\frac{1}{\sigma_{11}+1}}}\right) \\
+  & -\frac{1}{2K} \sqrt{\frac{2}{\pi}} \sum_{k>1} \frac{1}{\sqrt{\tau_{11}+1}}e^{-\frac{1}{2\left(\tau_{11}+1\right)}b_{1}^{2}}\operatorname{erf}\left(\frac{1}{\sqrt{2}\sqrt{1+\left(\tau_{kk}-\frac{\tau_{1k}^{2}}{\tau_{11}}\right)}}\cdot\frac{-\frac{\tau_{1k}}{\tau_{11}}\frac{b_{1}}{\tau_{11}+1}+b_{k}}{\sqrt{1+\frac{\tau_{1k}^{2}}{\tau_{11}+\left(\tau_{11}\tau_{kk}-\tau_{1k}^{2}\right)}\frac{1}{\tau_{11}+1}}}\right)
+\end{align*}
+
+Around init,
+\begin{align*}
+  K \tau \frac{d}{d t} b_1
+  &\approx \sqrt{\frac{2}{\pi}} \left( \frac{\mathrm{e}^{-\frac{b_1^2}{2({\sigma}_{11}+1)}}}{\sqrt{{\sigma}_{11}+1}} - \frac{\mathrm{e}^{-\frac{b_1^2}{2({\tau}_{11}+1)}}}{\sqrt{{\tau}_{11}+1}} \right) \\
+  & -\frac{1}{2K} \left[ \frac{e^{-\frac{1}{2}\left(1-\frac{\sigma_{11}}{\sigma_{11}+1}\right)b_{1}^{2}}}{\sqrt{\sigma_{11}+1}}\operatorname{erf}\left(\frac{1}{\sqrt{2}}\frac{\left(1-\frac{\sigma_{11}}{\sigma_{11}+1}\right)b_{1}}{\sqrt{1+\frac{\sigma_{11}}{\sigma_{11}+1}}}\right) + \frac{e^{-\frac{1}{2}\left(1-\frac{\tau_{11}}{\tau_{11}+1}\right)b_{1}^{2}}}{\sqrt{\tau_{11}+1}}\operatorname{erf}\left(\frac{1}{\sqrt{2}}\frac{\left(1-\frac{\tau_{11}}{\tau_{11}+1}\right)b_{1}}{\sqrt{1+\frac{\tau_{11}}{\tau_{11}+1}}}\right) \right] \\
+  & -\frac{1}{2K} \sqrt{\frac{2}{\pi}} \sum_{k>1} \frac{1}{\sqrt{\sigma_{11}+1}}e^{-\frac{1}{2\left(\sigma_{11}+1\right)}b_{1}^{2}}\operatorname{erf}\left(\frac{b_k}{\sqrt{2}\sqrt{1+\sigma_{kk}}} \right) \\
+  & -\frac{1}{2K} \sqrt{\frac{2}{\pi}} \sum_{k>1} \frac{1}{\sqrt{\tau_{11}+1}}e^{-\frac{1}{2\left(\tau_{11}+1\right)}b_{1}^{2}}\operatorname{erf}\left(\frac{b_k}{\sqrt{2}\sqrt{1+\tau_{kk}}} \right)
+\end{align*}
+
 
 
 

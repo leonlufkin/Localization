@@ -97,7 +97,7 @@ class NonlinearGPDataset(Dataset):
       C = jnp.minimum(C, L - C)
       C = jnp.exp(-C ** 2 / (xi ** 2))
       evals = jnp.diag(self.DRT.T @ C @ self.DRT)
-      sqrt_C = self.DRT @ jnp.diag(jnp.sqrt(evals)) @ self.DRT.T
+      sqrt_C = self.DRT @ jnp.diag(jnp.sqrt(jnp.maximum(evals, 0))) @ self.DRT.T
       
       z_id = jax.random.normal(key, (L,))
       z = sqrt_C @ z_id

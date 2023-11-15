@@ -7,6 +7,12 @@ def build_gaussian_covariance(n, xi):
     C = np.exp(-C ** 2 / (xi ** 2))
     return C
 
+def build_non_gaussian_covariance(n, xi, g):
+    C = build_gaussian_covariance(n, xi)
+    Z = lambda g: jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) ) )
+    C = 2/jnp.pi/(Z(g)**2) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) * C )
+    return C
+
 def gabor_real(c, b, a, x0, k0, x):
     n = len(x)
     d = np.minimum(x-x0, n - (x-x0))

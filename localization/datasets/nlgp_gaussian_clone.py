@@ -81,7 +81,7 @@ class NLGPGaussianCloneDataset(Dataset):
       return jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) ) )
     
     # old way, used prior to Nov 2, 2023
-    def generate_gaussian(key, xi, L, g):
+    def generate_gaussian_old(key, xi, L, g):
       C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
       C = jnp.minimum(C, L - C)
       C = jnp.exp(-C ** 2 / (xi ** 2))
