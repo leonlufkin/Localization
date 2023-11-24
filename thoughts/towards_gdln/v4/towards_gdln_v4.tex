@@ -182,6 +182,8 @@ This yields an important question: \emph{Does the model take the easy route by s
 Empirically, we see that the norms of $w^-$ and $b^-$ do indeed grow throughout training.
 The shape of the RF $w^-$ emerges relatively early on in training before it is ``smoothed out'' and scaled up in norm.
 
+[TODO: insert plots showing this transition between the two states]
+
 %% Gaussian data
 \paragraph*{Gaussian data}
 Let's momentarily assume $X_1$ and $X_0$ are Gaussian (i.e. $g \approx 0$) and go back to discrete land (it's a bit easier for my brain).
@@ -192,12 +194,25 @@ So,
   \PR_{X_1, X_0} \left( |\langle w, X_1 \rangle| > |\langle w, X_0 \rangle| \right)
   &= \int_{\R} \int_{[-|x_1|,|x_1|]} p_0(x_0) p_1(x_1) dx_0 dx_1 \\
   &= \int_{\R} \left[ \Phi\left( \frac{|x_1|}{\sqrt{w^\top \Sigma_0 w}} \right) - \Phi\left( \frac{-|x_1|}{\sqrt{w^\top \Sigma_0 w}} \right) \right] p_1(x_1) dx_1 \\
-  &= 2 \int_{\R_{\geq 0}} \left[ 2 \Phi\left( \frac{x_1}{\sqrt{w^\top \Sigma_0 w}} \right) - 1 \right] p_1(x_1) dx_1 \\
-  &= 4 \int_{\R_{\geq 0}} \Phi\left( \frac{x_1}{\sqrt{w^\top \Sigma_0 w}} \right) p_1(x_1) dx_1 - 1 \\
-  &= 4 \int_{\R_{\geq 0}} \left[ \frac{1}{2} \operatorname{erf}\left( \frac{1}{\sqrt{2}} \cdot \frac{x_1}{\sqrt{w^\top \Sigma_0 w}} \right) + \frac{1}{2} \right] p_1(x_1) dx_1 - 1 \\
+  % &= 2 \int_{\R_{\geq 0}} \left[ 2 \Phi\left( \frac{x_1}{\sqrt{w^\top \Sigma_0 w}} \right) - 1 \right] p_1(x_1) dx_1 \\
+  % &= 4 \int_{\R_{\geq 0}} \Phi\left( \frac{x_1}{\sqrt{w^\top \Sigma_0 w}} \right) p_1(x_1) dx_1 - 1 \\
+  % &= 4 \int_{\R_{\geq 0}} \left[ \frac{1}{2} \operatorname{erf}\left( \frac{1}{\sqrt{2}} \cdot \frac{x_1}{\sqrt{w^\top \Sigma_0 w}} \right) + \frac{1}{2} \right] p_1(x_1) dx_1 - 1 \\
   &= 2 \int_{\R_{\geq 0}} \operatorname{erf}\left( \frac{1}{\sqrt{2}} \cdot \frac{x_1}{\sqrt{w^\top \Sigma_0 w}} \right) p_1(x_1) dx_1 \\
-  &= \frac{ 2 }{ \sqrt{2\pi} \cdot \sqrt{w^\top \Sigma_1 w} } \int_{\R_{\geq 0}} \operatorname{erf}\left( \frac{1}{\sqrt{2}} \cdot \frac{x_1}{\sqrt{w^\top \Sigma_0 w}} \right) \exp\left( - \frac{1}{2 (w^\top \Sigma_1 w)} x_1^2 \right) dx_1
+  % &= \frac{ 2 }{ \sqrt{2\pi} \cdot \sqrt{w^\top \Sigma_1 w} } \int_{\R_{\geq 0}} \operatorname{erf}\bigg( \underbrace{ \frac{1}{\sqrt{2 (w^\top \Sigma_0 w)}} }_{\triangleq a} x_1 \bigg) \exp\bigg( - \underbrace{\frac{1}{2 (w^\top \Sigma_1 w)}}_{\triangleq b^2} x_1^2 \bigg) dx_1 \\
+  % &= \frac{ 2 }{ \sqrt{(2 \pi) w^\top \Sigma_1 w} } \left[ \frac{\sqrt{\pi}}{2b} - \frac{1}{b \sqrt{\pi}} \tan^{-1}\left( \frac{b}{a} \right) \right] \\
+  &= 1 - \frac{2}{\pi} \tan^{-1} \left( \sqrt{ \frac{ w^\top \Sigma_0 w }{ w^\top \Sigma_1 w } } \right).
 \end{align*}
+Therefore, for Gaussian data,
+\begin{align*}
+  w^- 
+  &= \argmax_{w \in S^{n-1}} \PR_{X_1, X_0} \left( |\langle w, X_1 \rangle| > |\langle w, X_0 \rangle| \right) \\
+  &= \argmax_{w \in S^{n-1}} 1 - \frac{2}{\pi} \tan^{-1} \left( \sqrt{ \frac{ w^\top \Sigma_0 w }{ w^\top \Sigma_1 w } } \right) \\
+  &= \argmin_{w \in S^{n-1}} \frac{ w^\top \Sigma_0 w }{ w^\top \Sigma_1 w } \\
+  &= F \left( \argmin_{u \in S^{n-1}} \frac{ u^\top \Lambda_0 u }{ u^\top \Lambda_1 u } \right),
+\end{align*}
+where $F$ is our real DFT operator and $\Lambda_i$ is the corresponding diagonal matrix of eigenvalues of $\Sigma_i$.
+Again, we can take $u$ to be unit norm without loss of generality.
+Then, $u^\top \Lambda_0 u = \sum_{k \in [n]} c_k \lambda_0^{(k)}$, where $c_k \geq 0$ and $\sum_k c_k = 1$.
 
 
 %% Polar coordinates
@@ -265,7 +280,72 @@ Then, maximizing this is just finding the leading eigenvector of the operator $K
 We can show that this is the constant function, which is inconsistent with our observation that we get Gabor-like RFs.
 Let's test this result empirically to see has any merit (note that maximizing the difference in means is \emph{not} the same as maximizing the probability dominance), and if Gabors are actually better.
 
+\subsection*{Optimality}
+We've explored what it takes for our neural network model to be optimal, but we want to understand how close it gets to universal optimality.
+We'll consider accuracy instead of loss because it lets us invoke the Neyman-Pearson lemma.
 
+Let us start by considering an arbitrary classifier $\hat{y}$ that sends an input $X_i$ to either $0$, if it believes $X_i \sim p_{\xi_0}$, or $1$ otherwise.
+Then, the optimal classifier, in terms of accuracy, is
+\begin{align*}
+  \hat{y}^* = \argmax_{\hat{y}} \PR_{X_1,X_0}( \hat{y}(X_i) = i )
+\end{align*}
+We can pose this as a hypothesis testing problem.
+\begin{align*}
+  H_0 &: X \sim p_{\xi_0} \\
+  H_1 &: X \sim p_{\xi_1}
+\end{align*}
+The Neyman-Pearson lemma tells us that the likelihood ratio test has the largest accuracy\footnote{Note that $1 - $accuracy = Type 1 error $+$ Type II error, which the likelihood ratio test minimizes.} among all tests.
+That is,
+\begin{align*}
+  \hat{y}^*(x) &= 
+  \begin{cases}
+    1 & \text{if } L(x) \triangleq \frac{ p_{\xi_1}(x) }{ p_{\xi_0}(x) } > \eta \\
+    0 & \text{otherwise}  
+  \end{cases},
+\end{align*}
+for some threshold $\eta > 0$.
+The corresponding accuracy is
+\begin{align*}
+  \frac{1}{2} \left( \PR_{X_1}\left( L(X_1) > \eta \right) + \PR_{X_0} \left( L(X_0) \leq \eta \right) \right)
+  % &= 1 - \PR_{X_1,X_0}\left( L(X_1) \leq \eta \land L(X_0) > \eta \right) \\
+  % &= 1 - \PR_{X_1,X_0}\left( L(X_1) \leq \tau < L(X_0) \right).% \\
+  % &= \PR_{X_1,X_0}\left( L(X_1) \geq \tau > L(X_0) \right).
+\end{align*}
+% Note this is invariant to $\tau$.
+
+I think we can make some progress here for the general case, but let's just consider Gaussian data for now.
+
+\paragraph*{Gaussian data}
+\begin{align*}
+  \frac{ p_{\xi_1}(x) }{ p_{\xi_0}(x) }
+  &= \frac{ \frac{1}{(2\pi)^{n/2}} |\Sigma_1|^{-\frac{1}{2}} \exp \left( -\frac{1}{2} x^\top \Sigma_1^{-1} x \right) }{ \frac{1}{(2\pi)^{n/2}} |\Sigma_0|^{-\frac{1}{2}} \exp \left( -\frac{1}{2} x^\top \Sigma_0^{-1} x \right) } \\
+  &= \sqrt{ \frac{|\Sigma_0|}{|\Sigma_1|} } \exp \left( -\frac{1}{2} x^\top (\Sigma_1^{-1} - \Sigma_0^{-1}) x \right) \\
+  &\simeq x^\top (\Sigma_1^{-1} - \Sigma_0^{-1}) x,
+\end{align*}
+where $\simeq$ means equal up to some monotonic transformation.
+% Let's further write this by diagonalizing the covariance matrices in the real DFT basis.
+% Letting $u = P^\top x$,
+% \begin{align*}
+%   \frac{ p_{\xi_1}(x) }{ p_{\xi_0}(x) }
+%   &\simeq u^\top (\Lambda_1^{-1} - \Lambda_0^{-1}) u.
+% \end{align*}
+% So, we want to find the threshold $\eta$ such that the test
+% \begin{align*}
+%   \hat{y}^*(x) &= 
+%   \begin{cases}
+%     1 & \text{if } u^\top (\Lambda_1^{-1} - \Lambda_0^{-1}) u < \eta \\
+%     0 & \text{otherwise}  
+%   \end{cases},
+% \end{align*}
+% has greatest accuracy.
+
+So, the optimal accuracy is given by
+\begin{align*}
+  \min_{\eta > 0} \frac{1}{2} \left( \PR_{X_1}\left( X_1^\top (\Sigma_1^{-1} - \Sigma_0^{-1}) X_1 < \eta \right) + \PR_{X_0} \left( X_0^\top (\Sigma_1^{-1} - \Sigma_0^{-1}) X_0 \geq \eta \right) \right)
+\end{align*}
+
+
+\paragraph*{Non-Gaussian data}
 
 
 

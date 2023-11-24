@@ -8,22 +8,12 @@ from functools import partial
 # from nets.datasets.base import Dataset
 # export PYTHONPATH="${PYTHONPATH}:./"
 from localization.datasets.base import Dataset, ExemplarType
-# from nets.datasets.base import DatasetSplit
+from localization.utils import build_DRT
 # from nets.datasets.base import ExemplarType
-# from nets.datasets.base import ExemplarLabeling
-# from nets.datasets.base import HoldoutClassLabeling
 
 from jax.scipy.special import erf as gain_function
+from localization.utils import build_gaussian_covariance
 
-#from line_profiler import LineProfiler
-#
-#profiler = LineProfiler()
-#def profile(func):
-#   def inner(*args, **kwargs):
-#       profiler.add_function(func)
-#       profiler.enable_by_count()
-#       return func(*args, **kwargs)
-#   return inner
 
 def slice_to_array(s: slice, array_length: int):
   """Convert a `slice` object to an array of indices."""
@@ -33,33 +23,16 @@ def slice_to_array(s: slice, array_length: int):
 
   return jnp.array(range(start, stop, step))
 
-def build_DRT(n):
-  DFT = jnp.zeros((n, n), dtype=complex)
-  w = jnp.exp(-2 * jnp.pi * 1j / n)
-  for i in range(DFT.shape[0]):
-    DFT = DFT.at[:,i].set(w ** (i * jnp.arange(n)) / jnp.sqrt(n))
 
-  DCT = DFT.real
-  DST = DFT.imag
-
-  DRT_ = jnp.sqrt(2) * jnp.concatenate((DCT[:, :(n//2+1)], DST[:, 1:(n//2)]), axis=1)
-  DRT_ = DRT_.at[:,0].set(DRT_[:,0] / jnp.sqrt(2))
-  DRT_ = DRT_.at[:,n//2].set(DRT_[:,n//2] / jnp.sqrt(2))
-  DRT = jnp.zeros((n, n))
-  DRT = DRT.at[:,0].set(DRT_[:,0])
-  DRT = DRT.at[:,1::2].set(DRT_[:,1:n//2+1])
-  DRT = DRT.at[:,2::2].set(DRT_[:,n//2+1:])
-  return DRT
-
-class NLGPGaussianCloneDataset(Dataset):
-  """Nonlinear Gaussian Process dataset."""
+class TDataset(Dataset):
+  """Dataset of exemplars and labels from a T distribution."""
 
   def __init__(
     self,
     key: Array,
     xi1: float = 0.1,
     xi2: float = 1.1,
-    gain: float = 1.,
+    df: float = 3.,
     class_proportion: float = 0.5,
     num_dimensions: int = 100,
     num_exemplars: int = 1000,
@@ -72,66 +45,48 @@ class NLGPGaussianCloneDataset(Dataset):
       num_exemplars=num_exemplars,
       )
 
-    # self.exemplar_noise_scale = exemplar_noise_scale
     self.num_dimensions = num_dimensions 
     self.DRT = build_DRT(num_dimensions)
-
-    # Compile a function for sampling exemplars at `Dataset.__init__`.
-    def Z(g):
-      return jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) ) )
     
-    # old way, used prior to Nov 2, 2023
-    def generate_gaussian_old(key, xi, L, g):
+    if df <= 2:
+      raise ValueError("Degrees of freedom must be greater than 2.")
+    
+    # use prior to November 23, 2023
+    def generate_t_old(key, xi, L, df):
       C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
       C = jnp.minimum(C, L - C)
       C = jnp.exp(-C ** 2 / (xi ** 2))
-      Sigma = (2/jnp.pi) / (Z(g) ** 2) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) * C )
-      x = jax.random.multivariate_normal(key, jnp.zeros(L), Sigma, method="svd")
+      C = (df-2) / df * C # rescaling so that covariance is C
+      x = jax.random.multivariate_t(key, jnp.zeros(L), C, df, method="svd") # FIXME: using svd for numerical stability, breaks if xi > 2.5 ish
       return x
-
-    # new way, equivalent in distribution but lets us make more direct comparisons to Gaussian clone
-    # randomness will be different, so it may yield slightly different results than before
-    def generate_gaussian(key, xi, L, g):
+    
+    def generate_t(key, xi, L, df):
       C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
       C = jnp.minimum(C, L - C)
       C = jnp.exp(-C ** 2 / (xi ** 2))
-      Sigma = (2/jnp.pi) / (Z(g) ** 2) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) * C )
-      evals = jnp.diag(self.DRT.T @ Sigma @ self.DRT)
-      sqrt_Sigma = self.DRT @ jnp.diag(jnp.sqrt(evals)) @ self.DRT.T
+      C = (df-2) / df * C # rescaling so that covariance is C
+      evals = jnp.diag(self.DRT.T @ C @ self.DRT)
+      sqrt_C = self.DRT @ jnp.diag(jnp.sqrt(jnp.maximum(evals, 0))) @ self.DRT.T
       
+      normal_key, chi_key = jax.random.split(key)
       z_id = jax.random.normal(key, (L,))
-      x = sqrt_Sigma @ z_id
+      normal_samples = sqrt_C @ z_id
+      chi2_samples = jax.random.chisquare(chi_key, df)
+      x = normal_samples / jnp.sqrt(chi2_samples / df)
       return x
-    
-    def generate_gaussian_branching(key, class_proportion, L, g, xi1, xi2):
-      label_key, exemplar_key = jax.random.split(key, 2)
-      label = jax.random.bernoulli(label_key, p=class_proportion)
-      xi = jnp.where(label, xi1, xi2)
-      exemplar = generate_gaussian(exemplar_key, xi, L, g)
-      label = 2 * jnp.float32(label) - 1
-      return exemplar, label
-
-    self.generate_xi = jax.jit(
-      jax.vmap(
-            partial(generate_gaussian_branching, 
-                    class_proportion=class_proportion,
-                    L=num_dimensions, g=gain,
-                    xi1=xi1, xi2=xi2
-                    ),
-        )
-    )
     
     self.generate_xi1 = jax.jit(
       jax.vmap(
-        partial(generate_gaussian,
-                xi=xi1, L=num_dimensions, g=gain,
+        partial(generate_t,
+                xi=xi1, L=num_dimensions, df=df,
                 ),
       )
     )
+    
     self.generate_xi2 = jax.jit(
       jax.vmap(
-        partial(generate_gaussian,
-                xi=xi2, L=num_dimensions, g=gain,
+        partial(generate_t,
+                xi=xi2, L=num_dimensions, df=df,
                 ),
       )
     )
@@ -194,25 +149,27 @@ class NLGPGaussianCloneDataset(Dataset):
 
 if __name__ =="__main__":
     key = jax.random.PRNGKey(0)
-    xi1, xi2, gain = 5, 1, 3
-    print("xi1, xi2, gain:", xi1, xi2, gain)
-    from nonlinear_gp import NonlinearGPDataset
-    dataset = NonlinearGPDataset(key=key, xi1=xi1, xi2=xi2, gain=gain, num_dimensions=40, num_exemplars=10000)
-    control_dataset = NLGPGaussianCloneDataset(key=key, xi1=xi1, xi2=xi2, gain=gain, num_dimensions=40, num_exemplars=10000)
-    
-    # original
-    x, y = dataset[:10000]
+    xi1, xi2, df = 5, 5, 5
+    print("xi1, xi2, gain:", xi1, xi2, df)
+    dataset = TDataset(key=key, xi1=xi1, xi2=xi2, df=df, num_dimensions=40, num_exemplars=100000)
+    x, y = dataset[:100000]
     xx = (x.T @ x) / len(x)
-    print(xx)
     
-    # control
-    x_, y_ = control_dataset[:10000]
-    xx_ = (x_.T @ x_) / len(x_)
-    print(xx_)
+    # examining covariance
+    import matplotlib.pyplot as plt
+    im = plt.imshow(xx, cmap='gray')
+    cbar = plt.colorbar(im)
+    plt.suptitle("Empirical covariance")
+    plt.savefig(f'../../thoughts/distributions/figs/multi_t{xi1}_{xi2}_{df}.png')
+    plt.close()
     
-    # difference
-    print( xx / xx_ )
-    print( jnp.linalg.norm(xx - xx_) )
-
+    # plotting difference between empirical and theoretical covariance
+    # note the difference is blotchy, suggesting issues with how we are generating randomness
+    im = plt.imshow(xx - build_gaussian_covariance(40, xi1))
+    cbar = plt.colorbar(im)
+    plt.suptitle("Difference between empirical and theoretical covariance")
+    plt.savefig(f'../../thoughts/distributions/figs/multi_t_diff{xi1}_{xi2}_{df}.png')
+    plt.close()
     
-
+    
+    

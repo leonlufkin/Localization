@@ -7,9 +7,10 @@ from functools import partial
 
 # from nets.datasets.base import Dataset
 # export PYTHONPATH="${PYTHONPATH}:./"
-from localization.datasets.base import Dataset
+from localization.datasets.base import Dataset, ExemplarType
+from localization.utils import build_DRT
 # from nets.datasets.base import DatasetSplit
-from nets.datasets.base import ExemplarType
+# from nets.datasets.base import ExemplarType
 # from nets.datasets.base import ExemplarLabeling
 # from nets.datasets.base import HoldoutClassLabeling
 
@@ -32,24 +33,6 @@ def slice_to_array(s: slice, array_length: int):
   step = s.step if s.step is not None else 1
 
   return jnp.array(range(start, stop, step))
-
-def build_DRT(n):
-  DFT = jnp.zeros((n, n), dtype=complex)
-  w = jnp.exp(-2 * jnp.pi * 1j / n)
-  for i in range(DFT.shape[0]):
-    DFT = DFT.at[:,i].set(w ** (i * jnp.arange(n)) / jnp.sqrt(n))
-
-  DCT = DFT.real
-  DST = DFT.imag
-
-  DRT_ = jnp.sqrt(2) * jnp.concatenate((DCT[:, :(n//2+1)], DST[:, 1:(n//2)]), axis=1)
-  DRT_ = DRT_.at[:,0].set(DRT_[:,0] / jnp.sqrt(2))
-  DRT_ = DRT_.at[:,n//2].set(DRT_[:,n//2] / jnp.sqrt(2))
-  DRT = jnp.zeros((n, n))
-  DRT = DRT.at[:,0].set(DRT_[:,0])
-  DRT = DRT.at[:,1::2].set(DRT_[:,1:n//2+1])
-  DRT = DRT.at[:,2::2].set(DRT_[:,n//2+1:])
-  return DRT
 
 
 class NonlinearGPDataset(Dataset):

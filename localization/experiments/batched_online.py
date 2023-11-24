@@ -163,11 +163,13 @@ def interval_to_str(interval):
   out = ",".join([ f"{x:05.2f}" for x in interval ])
   return f"{start}{out}{end}"
 
-def make_key(dataset_cls, support, xi1, xi2, class_proportion, batch_size, num_epochs, learning_rate, model_cls, use_bias, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, gain=None, **extra_kwargs):
+def make_key(dataset_cls, support, xi1, xi2, class_proportion, batch_size, num_epochs, learning_rate, model_cls, use_bias, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, gain=None, df=None, **extra_kwargs):
   dataset_name = dataset_cls.__name__
   model_name = model_cls.__name__
+  if df is not None and gain is not None:
+    raise ValueError("Cannot specify both `df` and `gain`.")
   return f'{dataset_name}{interval_to_str(support)}_xi1={interval_to_str(xi1)}_xi2={interval_to_str(xi2)}'\
-    f'{f"_gain={gain:.3f}" if gain is not None else ""}_p={class_proportion:.2f}'\
+    f'{f"_gain={gain:.3f}" if gain is not None else ""}{f"_df={df}" if df is not None else ""}_p={class_proportion:.2f}'\
     f'_batch_size={batch_size}_num_epochs={num_epochs}'\
     f'_loss=mse_lr={learning_rate:.3f}'\
     f'_{model_name}{"" if use_bias else "nobias"}_L={num_dimensions:03d}_K={num_hiddens:03d}_activation={activation.__name__ if isinstance(activation, Callable) else activation}'\
@@ -252,6 +254,7 @@ def simulate(
   dataset_cls: type[datasets.Dataset] = datasets.SinglePulseDataset,
   support: tuple[float, float] = (0.0, 1.0),
   gain: float | None = None,
+  df: float | None = None,
   model_cls: type[eqx.Module] = models.MLP,
   use_bias = True,
   init_fn: Callable = models.xavier_normal_init,
@@ -286,6 +289,7 @@ def simulate(
     xi1=xi1,
     xi2=xi2,
     gain=gain,
+    df=df,
     class_proportion=class_proportion,
     sampler_cls=sampler_cls,
     init_fn=init_fn

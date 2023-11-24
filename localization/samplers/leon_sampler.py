@@ -2,10 +2,10 @@ import jax
 import jax.numpy as jnp
 
 from jax import Array
-from nets.datasets.base import ExemplarType
+from localization.datasets.base import ExemplarType
 
-from nets.samplers.base import SingletonSampler, slice_to_array
-from nets.datasets import Dataset
+from localization.samplers.base import SingletonSampler, slice_to_array
+from localization.datasets import Dataset
 
 class LeonSampler(SingletonSampler):
   """Sampler of example-label pairs over multiple epochs."""

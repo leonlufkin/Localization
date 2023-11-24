@@ -1,10 +1,11 @@
 """`Dataset`s are sequences of unique examples."""
 from typing import Any
 from collections.abc import Sequence
-from nptyping import NDArray
-from nptyping import Bool
-from nptyping import Floating
-from nptyping import Int
+# from nptyping import NDArray
+# from nptyping import Bool
+# from nptyping import Floating
+# from nptyping import Int
+from numpy.typing import NDArray#, Bool, Floating, Int
 from jax import Array
 
 from enum import Enum
@@ -21,7 +22,7 @@ import jax.nn as jnn
 
 # Type hints.
 IndexType = int | Sequence[int] | slice
-ExemplarType = tuple[NDArray[Any, Floating], NDArray[Any, Int]]
+ExemplarType = tuple[NDArray[Any], NDArray[Any]]
 
 
 @unique

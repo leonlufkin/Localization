@@ -4,7 +4,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing_extensions import Protocol
 from jax import Array
-from nets.datasets.base import ExemplarType
+# from nets.datasets.base import ExemplarType
+from localization.datasets.base import ExemplarType
 
 from enum import Enum
 from enum import unique
@@ -16,8 +17,10 @@ import jax
 from jax import numpy as jnp
 from jax import nn as jnn
 
-from nets.datasets import Dataset
-from nets.datasets import DatasetSplit
+from localization.datasets import Dataset, DatasetSplit
+
+# from nets.datasets import Dataset
+# from nets.datasets import DatasetSplit
 
 
 # The initial number of sequences to instantiate within an infinite `Sampler`.
