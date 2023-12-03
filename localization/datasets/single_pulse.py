@@ -125,7 +125,7 @@ class SinglePulseDataset(Dataset):
     exemplars = exemplars[perm[:n]]
     labels = labels[perm[:n]] 
     # randomly flip sign of exemplars
-    sign = jax.random.bernoulli(keys[0], p=0.5)
+    sign = jax.random.bernoulli(keys[0], p=0.5, shape=(n,1))
     exemplars = jnp.where(sign, exemplars, 1-exemplars)
     # adjust support of exemplars
     exemplars = self.adjust_support(exemplars)

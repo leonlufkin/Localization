@@ -37,7 +37,7 @@ from localization import models
 def accuracy(pred_y: Array, y: Array) -> Array:
   """Compute elementwise accuracy."""
   # print("accuracy: pred_y.shape=", pred_y.shape, "y.shape=", y.shape)
-  predicted_class = jnp.where(pred_y > 0.5, 1., 0.) # jnp.argmax(pred_y, axis=-1)
+  predicted_class = jnp.where(pred_y > 0.5, 1., 0.) # jnp.argx(pred_y, axis=-1)
   return predicted_class == y
 
 
@@ -163,7 +163,7 @@ def interval_to_str(interval):
   out = ",".join([ f"{x:05.2f}" for x in interval ])
   return f"{start}{out}{end}"
 
-def make_key(dataset_cls, support, xi1, xi2, class_proportion, batch_size, num_epochs, learning_rate, model_cls, use_bias, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, gain=None, df=None, **extra_kwargs):
+def make_key(dataset_cls, support, xi1, xi2, class_proportion, batch_size, num_epochs, learning_rate, model_cls, use_bias, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, gain=None, df=None, seed=0, **extra_kwargs):
   dataset_name = dataset_cls.__name__
   model_name = model_cls.__name__
   if df is not None and gain is not None:
@@ -173,7 +173,8 @@ def make_key(dataset_cls, support, xi1, xi2, class_proportion, batch_size, num_e
     f'_batch_size={batch_size}_num_epochs={num_epochs}'\
     f'_loss=mse_lr={learning_rate:.3f}'\
     f'_{model_name}{"" if use_bias else "nobias"}_L={num_dimensions:03d}_K={num_hiddens:03d}_activation={activation.__name__ if isinstance(activation, Callable) else activation}'\
-    f'_init_scale={init_scale:.3f}_{init_fn.__name__ if isinstance(init_fn, Callable) else init_fn}'
+    f'_init_scale={init_scale:.3f}_{init_fn.__name__ if isinstance(init_fn, Callable) else init_fn}'\
+    f'_seed={seed:d}'
   
 def evaluate(
   iteration: int,
