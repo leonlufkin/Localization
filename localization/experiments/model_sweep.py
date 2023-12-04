@@ -80,7 +80,7 @@ if __name__ == '__main__':
         if learning_rate == 0.02 and num_epochs == 2000:
             return
         
-        if learning_rate = 0.1 and (gain == 3 or gain == 100) and init_scale = 0.01: # already ran
+        if learning_rate == 0.1 and (gain == 3 or gain == 100) and init_scale == 0.01: # already ran
             return
             
         # NOTE: using `simulate_or_load` will effectively skip jobs that have already been run
