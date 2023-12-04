@@ -49,20 +49,23 @@ if __name__ == '__main__':
         num_dimensions=40,
         xi1=2,
         xi2=1,
-        batch_size=1000,
+        batch_size=50000,
         support=(-1, 1), # defunct
         class_proportion=0.5,
         # model config
         model_cls=models.SimpleNet,
         sampler_cls=samplers.EpochSampler,
         init_fn=models.xavier_normal_init,
-        init_scale=1.,
+        init_scale=0.01,
+        num_hiddens=1,
+        activation='relu',
+        use_bias=False,
         # learning config
-        num_epochs=5000,
+        num_epochs=2000,
         evaluation_interval=10,
+        learning_rate=0.1,
         optimizer_fn=optax.sgd,
         # experiment config
-        seed=0,
         save_=True,
         wandb_=False,
     )
@@ -95,15 +98,12 @@ if __name__ == '__main__':
     ## Submit jobs
     jobs = submit_jobs(
         executor=executor,
-        func=filter,
+        func=simulate_or_load,
         kwargs_array=product_kwargs(
             **tupify(config_),
             # These are the settings we're sweeping over
+            seed=tuple(np.arange(30)),
             dataset_cls=(datasets.NonlinearGPDataset, datasets.NLGPGaussianCloneDataset,),
-            num_hiddens=(1, 40,),
-            activation=('relu', 'sigmoid',),
-            use_bias=(True, False,),
-            learning_rate=(1.0, 0.025, 20.0, 0.5,),
-            gain=np.linspace(0.01, 5, 10),
+            gain=(3, 100,),
         ),
     )
