@@ -56,14 +56,11 @@ if __name__ == '__main__':
         model_cls=models.SimpleNet,
         sampler_cls=samplers.EpochSampler,
         init_fn=models.xavier_normal_init,
-        init_scale=0.01,
         num_hiddens=1,
         activation='relu',
         use_bias=False,
         # learning config
-        num_epochs=2000,
         evaluation_interval=10,
-        learning_rate=0.1,
         optimizer_fn=optax.sgd,
         # experiment config
         save_=True,
@@ -72,24 +69,19 @@ if __name__ == '__main__':
     
     # helper function to only sweep across subset of hyperparameters
     def filter(**kwargs):
+        init_scale = kwargs['init_scale']
         activation = kwargs['activation']
-        num_hiddens = kwargs['num_hiddens']
+        gain = kwargs['gain']
         learning_rate = kwargs['learning_rate']
-        use_bias = kwargs['use_bias']
+        num_epochs = kwargs['num_epochs']
         
-        if activation == 'relu':
-            if num_hiddens == 40 and learning_rate != 1.0:
-                return
-            if num_hiddens == 1 and learning_rate != 0.025:
-                return
-            
-        if activation == 'sigmoid':
-            if not use_bias:
-                return
-            if num_hiddens == 40 and learning_rate != 20.0:
-                return
-            if num_hiddens == 1 and learning_rate != 0.5:
-                return
+        if learning_rate == 0.1 and num_epochs == 10000:
+            return
+        if learning_rate == 0.02 and num_epochs == 2000:
+            return
+        
+        if learning_rate = 0.1 and (gain == 3 or gain == 100) and init_scale = 0.01: # already ran
+            return
             
         # NOTE: using `simulate_or_load` will effectively skip jobs that have already been run
         #       if one needs to re-run jobs (specifically when using a new evaluation_interval), use `simulate` instead
@@ -98,12 +90,15 @@ if __name__ == '__main__':
     ## Submit jobs
     jobs = submit_jobs(
         executor=executor,
-        func=simulate_or_load,
+        func=filter,
         kwargs_array=product_kwargs(
             **tupify(config_),
             # These are the settings we're sweeping over
             seed=tuple(np.arange(30)),
+            init_scale=(0.001, 0.01, 0.5), # already did 0.01
             dataset_cls=(datasets.NonlinearGPDataset, datasets.NLGPGaussianCloneDataset,),
-            gain=(3, 100,),
+            gain=(1.1, 3, 100,),
+            learning_rate=(0.02, 0.1,),
+            num_epochs=(10000, 2000),
         ),
     )
