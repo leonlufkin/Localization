@@ -60,7 +60,7 @@ class BlockDataset(Dataset):
     # num_exemplars_ = 2 * num_dimensions
     
     super().__init__(
-      key=key,  # TODO(eringrant): Use a separate key.
+      key=key,  # TODO: Use a separate key.
       # num_exemplars=(num_dimensions // xi1 + num_dimensions // xi2)# * 2
       num_exemplars=num_exemplars
     )

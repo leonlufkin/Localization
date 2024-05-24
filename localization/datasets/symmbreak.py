@@ -41,7 +41,7 @@ class SymmBreakDataset(Dataset):
     self.batch_size = batch_size
     
     super().__init__(
-      key=key,  # TODO(eringrant): Use a separate key.
+      key=key,  # TODO: Use a separate key.
       num_exemplars=self.dataset.num_exemplars,
       )
 

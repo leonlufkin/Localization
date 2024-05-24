@@ -29,7 +29,7 @@ class AdjustMarginalDataset(Dataset):
     self.marginal_adjust = marginal_adjust
     
     super().__init__(
-      key=key,  # TODO(eringrant): Use a separate key.
+      key=key,  # TODO: Use a separate key.
       num_exemplars=self.dataset.num_exemplars,
       )
 

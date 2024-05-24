@@ -197,7 +197,7 @@ def evaluate(
   metrics["training iteration"] = iteration
 
   ### Behavioral metrics.
-  # TODO(eringrant): Figure out the right syntax for `eqx.filter_vmap`.
+  # TODO: Figure out the right syntax for `eqx.filter_vmap`.
   _eval_step = jax.vmap(partial(eval_step, model=model, loss_fn=loss_fn), (0, 0, 0))
 
   # Probing metric shapes.
@@ -249,7 +249,7 @@ def supervise(
   init_scale: float,
   activation: str | Callable,
   # Training and evaluation params.
-  learning_rate: float | Callable,  # TODO(eringrant): Define interface.
+  learning_rate: float | Callable,  # TODO: Define interface.
   batch_size: int,
   num_epochs: int,
   # Dataset params.

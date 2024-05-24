@@ -14,7 +14,7 @@ def simulate(supervise=True, **kwargs):
 def load(**kwargs):
   path_key = make_key(**kwargs)
   print(path_key)
-  weightwd = '/Users/leonlufkin/Documents/GitHub/Localization/localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/weights'
+  weightwd = '../results/weights'
   if path_key + '.npz' in os.listdir(weightwd):
     print('Already simulated')
     data = jnp.load(weightwd + '/' + path_key + '.npz', allow_pickle=True)

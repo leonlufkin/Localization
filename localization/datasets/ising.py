@@ -112,7 +112,7 @@ class IsingDataset(Dataset):
   ):
     """Initializes a `NonlinearGPDataset` instance."""
     super().__init__(
-      key=key,  # TODO(eringrant): Use a separate key.
+      key=key,  # TODO: Use a separate key.
       num_exemplars=num_exemplars,
       )
     

@@ -263,7 +263,7 @@ def ica(
   num_dimensions: int,
   get_source_log_prob: Callable,
   # Training and evaluation params.
-  learning_rate: float | Callable,  # TODO(eringrant): Define interface.
+  learning_rate: float | Callable,  # TODO: Define interface.
   batch_size: int,
   # Dataset params.
   xi: tuple[float] = (3, 0.1),
