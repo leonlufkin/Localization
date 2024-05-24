@@ -116,7 +116,6 @@ class NonlinearGPDataset(Dataset):
     # index, n = self.process_index(index)
     
     if isinstance(index, slice):
-      # TODO(leonl): Deal with the case where `index.stop` is `None`.
       if index.stop is None:
         raise ValueError("Slice `index.stop` must be specified.")
       index = slice_to_array(index, len(self))

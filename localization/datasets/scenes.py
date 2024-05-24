@@ -40,7 +40,7 @@ class ScenesDataset(Dataset):
     self.side_length = side_length
     
     # Load images
-    self.scenes = scipy.io.loadmat('/Users/leonlufkin/Documents/GitHub/Localization/localization/datasets/IMAGES.mat')['IMAGES']
+    self.scenes = scipy.io.loadmat('./localization/datasets/IMAGES.mat')['IMAGES']
     self.scenes = jnp.rollaxis(self.scenes, -1)
     
     # Sampling functions
@@ -75,7 +75,6 @@ class ScenesDataset(Dataset):
     # index, n = self.process_index(index)
     
     if isinstance(index, slice):
-      # TODO(leonl): Deal with the case where `index.stop` is `None`.
       if index.stop is None:
         raise ValueError("Slice `index.stop` must be specified.")
       index = slice_to_array(index, len(self))

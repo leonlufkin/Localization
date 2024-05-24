@@ -42,7 +42,7 @@ class NLGPGaussianCloneDataset(Dataset):
     key: Array,
     # xi1: float = 0.1,
     # xi2: float = 1.1,
-    
+    # xi=
     gain: float = 1.,
     class_proportion: float = 0.5,
     num_dimensions: int = 100,
@@ -135,7 +135,6 @@ class NLGPGaussianCloneDataset(Dataset):
     """Get the exemplar(s) and the corresponding label(s) at `index`."""
 
     if isinstance(index, slice):
-      # TODO(leonl): Deal with the case where `index.stop` is `None`.
       if index.stop is None:
         raise ValueError("Slice `index.stop` must be specified.")
       index = slice_to_array(index, len(self))
