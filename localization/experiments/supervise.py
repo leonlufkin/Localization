@@ -1,6 +1,5 @@
 """Simulate online stochastic gradient descent learning of a simple task."""
 
-# Pandas before JAX or JAXtyping. # TODO:(leonl) Why?
 import pandas as pd
 from pandas.api.types import CategoricalDtype
 
@@ -519,7 +518,7 @@ def supervise(
   metrics['epoch'] = np.minimum(metrics.index * evaluation_interval, num_epochs)
   metrics = metrics.to_numpy()[:,:-1]
   if save_:
-    weightwd = '/Users/leonlufkin/Documents/GitHub/Localization/localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/weights'
+    weightwd = './localization/results/weights'
     np.savez(f"{weightwd}/{path_key}.npz", weights=weights, metrics=metrics)
     print("Saved " + path_key + ".npz")
 

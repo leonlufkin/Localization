@@ -1,6 +1,5 @@
 """Simulate online stochastic gradient descent learning of a simple task."""
 
-# Pandas before JAX or JAXtyping. # TODO:(leonl) Why?
 import pandas as pd
 from pandas.api.types import CategoricalDtype
 
@@ -352,15 +351,11 @@ def simulate(
       
   def save_model_weights(train_step_num):
     # save model weights
-    if gethostname() == 'Leons-MBP': 
-      jnp.save(f"results/weights/{path_key}/fc1_{train_step_num}.npy", model.fc1.weight)
-    else:
-      os.makedirs(f"/tmp/weights/", exist_ok=True)
-      jnp.save(f"/tmp/weights/fc1_{train_step_num}.npy", model.fc1.weight)
+    jnp.save(f"results/weights/{path_key}/fc1_{train_step_num}.npy", model.fc1.weight)
     print(f"Saved model weights at iteration {train_step_num}.")
   
   weights = [] # just for local runs
-  weights.append(model.fc1.weight) if gethostname() == 'Leons-MBP' else save_model_weights(train_step_num=0)
+  weights.append(model.fc1.weight)
   
   for epoch, (x, y) in enumerate(batcher(train_sampler, batch_size)):
     (train_key,) = jax.random.split(train_key, 1)
@@ -384,7 +379,7 @@ def simulate(
       
       log_to_wandb(metrics_) if wandb_ else metrics.append(metrics_)
       
-      weights.append(model.fc1.weight) if gethostname() == 'Leons-MBP' else save_model_weights(train_step_num=train_step_num)
+      weights.append(model.fc1.weight)
       
       start_time = time.time()
 
@@ -395,22 +390,15 @@ def simulate(
     print("wandb.finish() failed")
 
   # combine all weights in /tmp/weights/
-  if gethostname() != 'Leons-MBP':
-    weights = [ np.load(f"'/tmp/weights/fc1_{train_step_num}.npy") for train_step_num in range(0, num_epochs+1, evaluation_interval) ]
+  weights = [ np.load(f"'/tmp/weights/fc1_{train_step_num}.npy") for train_step_num in range(0, num_epochs+1, evaluation_interval) ]
   weights = np.stack(weights, axis=0)
-  if gethostname() == 'Leons-MBP':
-    os.makedirs(f"results/weights/{path_key}", exist_ok=True)
-    np.save(f"results/weights/{path_key}/fc1.npy", weights)
-  else:
-    np.save(f"/ceph/scratch/leonl/results/jax_results/fc1_{path_key}.npy", weights)
+  os.makedirs(f"results/weights/{path_key}", exist_ok=True)
+  np.save(f"results/weights/{path_key}/fc1.npy", weights)
 
   if not wandb_:
     df = pd.DataFrame(metrics)
     df['epoch'] = np.minimum(df.index * evaluation_interval, num_epochs)
-    if gethostname() == 'Leons-MBP':
-      df.to_csv(f"results/weights/{path_key}/metrics.csv")
-    else:
-      df.to_csv(f"/ceph/scratch/leonl/results/jax_results/{path_key}/metrics.csv")
+    df.to_csv(f"results/weights/{path_key}/metrics.csv")
     return df
 
 if __name__ == '__main__':
