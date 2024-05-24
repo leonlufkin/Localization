@@ -30,7 +30,6 @@ def get_executor(job_name, cluster="slurm", partition="cpu", timeout_min=60, mem
   executor = get_submitit_executor(
     timeout_min=timeout_min,
     mem_gb=mem_gb,
-    # export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl"
     # NOTE: `log_dir` should be set to a directory shared across the head
     # (launching) node as well as compute nodes;
     # can set `export RESULTS_HOME="..." external to Python or
