@@ -42,7 +42,7 @@ def generate_gaussian_to_vmap(key, L, xi, dim=1, num_samples=1):
     z = jax.random.multivariate_normal(key, np.zeros(L), C, shape=(num_samples,))
     return z
 
-# TODO(leonl): Vectorize this function with `jax.vmap` across `num_samples`!
+# TODO: Vectorize this function with `jax.vmap` across `num_samples`!
 def generate_non_gaussian(key, xi, L, g, dim=1, num_samples=1000):
     z = generate_gaussian(key, xi, L, dim=dim, num_samples=num_samples)
     x = gain_function(g * z) / Z(g)
@@ -106,7 +106,7 @@ if __name__ == '__main__':
         in_axes=(0, 0),
     )
 
-    # TODO(leonl): Remove warm-up (compilation) from this eval.
+    # TODO: Remove warm-up (compilation) from this eval.
     start_time = time.time()
     result_with_jit_vmap = generate_non_gaussian_vmapped(
         jax.random.split(key, N_xi),

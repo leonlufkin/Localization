@@ -22,13 +22,13 @@ def generate_gaussian(key, xi, L, num_samples=1):
     z = jax.random.multivariate_normal(key, np.zeros(L), C, shape=(num_samples,))
     return z
 
-# TODO(leonl): Vectorize this function with `jax.vmap` across `num_samples`!
+# TODO: Vectorize this function with `jax.vmap` across `num_samples`!
 def generate_non_gaussian_samples(key, xi, L, g, num_samples=1000):
     z = generate_gaussian(key, xi, L, num_samples=num_samples)
     x = gain_function(g * z) / Z(g)
     return x
 
-# FIXME: leon's attempt! (see below)
+# FIXME: attempt! (see below)
 def generate_non_gaussian(key, xi, L, g):
     C = jnp.abs(jnp.tile(jnp.arange(L)[:, jnp.newaxis], (1, L)) - jnp.tile(jnp.arange(L), (L, 1)))
     C = jnp.exp(-C ** 2 / (xi ** 2))
