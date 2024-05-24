@@ -183,7 +183,6 @@ class SimpleNet(eqx.Module):
     ) 
     self.act = act
 
-    # TODO(leonl): Add an static layer with input dimension `hidden_features`.
     del hidden_features
 
 
@@ -191,10 +190,6 @@ class SimpleNet(eqx.Module):
     """Apply the MLP block to the input."""
     x = self.fc1(x)
     x = self.act(x)
-
-    # TODO(leonl): Call the static layer with input dimension `hidden_features`.
-    #x = self.fc2(x)
-    #x = self.act(x)
 
     x = jnp.mean(x)#, axis=0)#.reshape(-1)
 
@@ -245,7 +240,6 @@ class GatedNet(eqx.Module):
     ) 
     self.gate = act
 
-    # TODO(leonl): Add an static layer with input dimension `hidden_features`.
     del hidden_features
 
 

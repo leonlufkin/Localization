@@ -4,7 +4,7 @@ from localization.samplers.base import Sampler
 from localization.samplers.base import SequenceSampler
 from localization.samplers.base import SingletonSampler
 from localization.samplers.base import EpochSampler
-from localization.samplers.leon_sampler import LeonSampler as OnlineSampler
+from other_sampler import OtherSampler as OnlineSampler
 
 __all__ = (
   "QueryType",
