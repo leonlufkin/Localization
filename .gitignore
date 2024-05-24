@@ -1,7 +1,4 @@
-# LEON'S IGNORE LIST
-leonl/figs
-leonl/results
-leonl/logs
+# IGNORE LIST
 experiments/OLD
 results/*
 wandb/*
