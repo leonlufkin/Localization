@@ -4,8 +4,6 @@
 # 2. It shows how moving from 2 -> 3 -> 4 -> 10 -> 30 targets with CE changes RFs
 # 3. The same as 2., but for MSE
 
-# export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl" # <- this should allow us to import from submit.py
-
 import numpy as np
 import optax
 from localization import datasets, models, samplers

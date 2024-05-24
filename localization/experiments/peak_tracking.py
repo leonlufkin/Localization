@@ -1,4 +1,3 @@
-# export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl" # <- this should allow us to import from submit.py
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -76,7 +75,7 @@ def track_peaks(n=5, **config):
     
     # save results
     path_key = make_key(**config, dataset_cls=datasets.NonlinearGPDataset)
-    fig.savefig('/ceph/scratch/leonl/peak_tracking/' + path_key + '.png', dpi=300)
+    fig.savefig('###NEW_WD/peak_tracking/' + path_key + '.png', dpi=300)
 
 if __name__ == '__main__':
 

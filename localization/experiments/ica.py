@@ -3,8 +3,6 @@ Simulate online stochastic gradient descent learning of a simple task.
 Help from: https://github.com/tuananhle7/ica/blob/main/ica.py
 """
 
-
-# Pandas before JAX or JAXtyping. # TODO:(leonl) Why?
 import pandas as pd
 from pandas.api.types import CategoricalDtype
 
@@ -453,7 +451,7 @@ def ica(
   metrics['iteration'] = np.minimum(metrics.index * evaluation_interval, num_steps)
   metrics = metrics.to_numpy()[:,:-1]
   if save_:
-    weightwd = '/Users/leonlufkin/Documents/GitHub/Localization/localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/weights'
+    weightwd = './localization/results/weights'
     np.savez(f"{weightwd}/{path_key}.npz", raw_mixing_matrices=raw_mixing_matrices, mixing_matrices=mixing_matrices, metrics=metrics, Wz=Wz, mean=mean)
     print("Saved " + path_key + ".npz")
 

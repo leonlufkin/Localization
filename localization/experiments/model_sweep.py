@@ -1,5 +1,3 @@
-# export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl" # <- this should allow us to import from submit.py
-
 import numpy as np
 import optax
 from localization import datasets, models, samplers
@@ -23,7 +21,6 @@ if __name__ == '__main__':
     # get_submitit_executor(
     #     timeout_min=60,
     #     mem_gb=10,
-    #     # export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl"
     #     # NOTE: `log_dir` should be set to a directory shared across the head
     #     # (launching) node as well as compute nodes;
     #     # can set `export RESULTS_HOME="..." external to Python or

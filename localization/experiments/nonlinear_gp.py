@@ -1,6 +1,5 @@
 """Simulate online stochastic gradient descent learning of a simple task."""
 
-# Pandas before JAX or JAXtyping. # TODO:(leonl) Why?
 import pandas as pd
 from pandas.api.types import CategoricalDtype
 
@@ -344,7 +343,7 @@ def simulate(
   path_key = make_key(xi1, xi2, gain, num_dimensions, num_hiddens, batch_size, num_epochs, learning_rate, "tanh", 0.0, init_scale)
   
   
-  if gethostname() == 'Leons-MBP': os.makedirs(f"results/weights/{path_key}", exist_ok=True)
+  os.makedirs(f"results/weights/{path_key}", exist_ok=True)
   for epoch, (x, y) in enumerate(batcher(train_sampler, batch_size)):
     (train_key,) = jax.random.split(train_key, 1)
     train_step_num = int(next(itercount))
@@ -368,11 +367,7 @@ def simulate(
       )
       
       # save model weights
-      if gethostname() == 'Leons-MBP': 
-        jnp.save(f"results/weights/{path_key}/fc1_{train_step_num}.npy", model.fc1.weight)
-      else:
-        os.makedirs(f"/tmp/weights/", exist_ok=True)
-        jnp.save(f"/tmp/weights/fc1_{train_step_num}.npy", model.fc1.weight)
+      jnp.save(f"results/weights/{path_key}/fc1_{train_step_num}.npy", model.fc1.weight)
       print(f"Saved model weights at iteration {train_step_num}.")
       
       start_time = time.time()
@@ -380,13 +375,13 @@ def simulate(
   print("Training finished.")
 
   # combine all weights in /tmp/weights/
-  weights = [ np.load(f"{f'results/weights/{path_key}' if gethostname() == 'Leons-MBP' else '/tmp/weights'}/fc1_{train_step_num}.npy") for train_step_num in range(evaluation_interval, num_epochs+1, evaluation_interval) ]
+  weights = [ np.load(f"results/weights/{path_key}/fc1_{train_step_num}.npy") for train_step_num in range(evaluation_interval, num_epochs+1, evaluation_interval) ]
   weights = np.stack(weights, axis=0)
-  np.save(f"{f'results/weights/' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/jax_results'}/fc1_{path_key}.npy", weights)
+  np.save(f"results/weights/fc1_{path_key}.npy", weights)
 
   df = pd.concat(metrics).reset_index(drop=True)
   df['epoch'] = np.minimum(df.index * evaluation_interval, num_epochs)
-  df.to_csv(f"{f'results/weights/' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/jax_results'}/metrics_{path_key}.csv")
+  df.to_csv(f"results/weights/metrics_{path_key}.csv")
 
   return df
 
