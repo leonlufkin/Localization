@@ -1,0 +1,100 @@
+Primary visual cortex has been studied extensively.
+A variety of works have shown that neurons in V1 have localized RFs that are oriented and bandpass, and thus modeled well by Gabor functions.
+A rich history of work has searched for computational mechanisms that can reproduce the variety of RFs observed in V1.
+The seminal work in this area is \cite{olshausen1996emergence}, who showed a feedforward neural network with continuous activation trained on (whitened) natural images to minimize $L^2$ reconstruction error using gradient descent, plus a sparsity penalty, could learn Gabor-like filters.
+The sparse coding constraint was inspired by the fact that V1 neurons are sparse.
+While this constraint is capable of producing Gabor-like filters, it is not clear how V1 would impose such a constraint, nor why it would need to.
+
+% \textbf{Talk about ICA.}
+Another important line of work is independent component analysis (ICA).
+ICA works by finding a linear transformation of the data such that the components are as independent as possible, as opposed to PCA, which seeks to minimize correlation.
+ICA suggests the emergence of orientation selectivity is the result of reducing redundancy among higher-order statistics.
+However, \cite{eichhorn2009natural} suggests this is unlikely to be the case, since orientation selectivity does not actually lower redundancy much.
+
+Another important work I came across is \cite{brito2016nonlinear}.
+They show that nonlinear Hebbian learning can generalize foundational normative models of localized RFs, like sparse coding and ICA, as well as bottom-up approaches, such as the Bienenstock-Cooper-Munro model of synaptic plasticity.
+They argue and provide evidence that this explains why all these models yield qualitative similar results, and come up with a heuristic based on kurtosis for whether a given nonlinearity will yield localized RFs.
+This is a substantial generalization of Andrew's work \cite{saxe2011modeling}, insofar as he also showed that a variety of algorithms can qualitatively reproduce the RFs seen throughout sensory cortex.
+
+The mathematics in \cite{brito2016nonlinear} is a bit hand-wavy, but it does seem to be capable of explaining a lot of the variation seen in whether an algorithm will yield localized RFs when trained on natural images.
+However, their work clearly suggests that without a sparsity penalty, a model trained with vanilla gradient descent will not localize (see Fig. 3d).
+\cite{ingrosso2022data} somewhat disprove this with their synthetic data model, which \cite{pellegrini2022neural} shows can hold when training on ImageNet32, although they needed to use pruning to extract the embedded localized RFs.
+\cite{redman2023sparsity} shows that adding an L1 penalty encourages localization (I feel like this result is a bit obvious, though, since an L1 penalty encourages sparsity, which is likely localized).
+
+One of the most thorough ``bottom-up'' models of V1 development I've seen is \cite{zylberberg2011sparse}.
+Here, they show that a network of leaky-integrate-and-fire neurons updated using Oja's rule can capture the variety of filters seen in V1.
+Importantly, similar to \cite{brito2016nonlinear}, they show that their learning rule can be interpreted as a constrained optimization problem, where the constraint is that the neurons' firings are sparse.
+An important point they make is that their model uses a \emph{local} learning rule, whereas the original sparse coding model used a \emph{global} learning rule, which is not as biologically plausible.
+Our setting uses a global learning rule, which is a potential weakness, though I don't think this matters for the questions we are asking.
+
+\subsection*{What is left to be explained?}
+% The above works explain a lot about V1 RFs, but there are still some open questions.
+To the best of my knowledge, no work explains \emph{why V1 RFs have a Gabor/sinusoidal structure}.
+The usual intuition is that it's because Gabor wavelets are optimal for representing images with minimal space-frequency uncertainty.
+Our work suggests that this may be driven by the structure of the covariance of whitened natural images and the separation of their marginal distributions.
+However, we need to be able to account for the variety of orientations and phases of V1 RFs.
+Extending Alessandro's toy model can account for the variety of phases, but it's not clear how to account for the variety of orientations.
+
+In this vein, another unanswered question is \emph{why V1 RFs are localized}, or perhaps more precisely, \emph{what about natural images drives localization?}
+It is easy to construct a network that is not localized yet performs equally well (at least in the simple model of \cite{ingrosso2022data}).
+Our work establishes some sufficient conditions for localization, though it is not clear whether these are necessary, as well some negative results that seem to run contrary to the standard argument that kurtosis drives localization (as mentioned in \cite{brito2016nonlinear} and \cite{ingrosso2022data}).
+My current impression is that this might be the best place for us to make a contribution given the results we have, though we definitely still have more technical work to do to make this rigorous.
+
+\subsection*{Where would we fit in?}
+As I understand it, Andrew's original idea was to address the first question above: to use our work to explain why V1 RFs have a Gabor/sinusoidal structure.
+To make this connection, we need to move away from the toy model and towards natural images, and also towards an unsupervised learning setting.
+We would also probably need to show analytically how the steady state of the localizing ODE is related to the covariance of the data, since it's not obvious from staring at the equation that the steady state is localized with bandwidth close to the covariance.
+
+If we were instead to focus on the second question above, we would have to connect our toy setting to an unsupervised setting based on natural images that can capture a variety of orientations and off-phase RFs.
+We identified this challenge when we met with Andrew in mid-December, but I still have not been able to come up with a good solution.
+It seems that in order to get this to work, we would have to either tweak with the data model or the learning rule so much that my existing analysis would not be relevant.
+There is certainly still an empirical approach to be taken here by, say, constructing a dataset of images and slowly tweaking the covariance and marginals to see how that affects the RFs, and hopefully showing it's consistent with our analysis in the toy setting.
+However, I haven't had a chance to explore this yet.
+
+Additionally, to make the jump from artificial neural networks to biological ones, we would probably need to connect our vanilla gradient descent setting to a biologically plausible one as discussed in \cite{brito2016nonlinear}.
+
+% Additionally, there is the overarching concern that our model uses \emph{vanilla} gradient descent, while biologically-plausible models effectively always incorporate some form of regularization (as discussed in \cite{brito2016nonlinear}).
+% the idea was to propose that vanilla gradient descent is sufficient to produce Gabor-like RFs in response to natural images.
+% Specifically, we would be trying to characterize \emph{which aspects of natural image statistics} are necessary and sufficient for learning localized Gabor-like RFs.
+
+
+
+% To my understanding, this question has never been asked precisely. % (perhaps empirically, but certainly not analytically).
+% [Brite \& Gerstner (2016)] argue that Nonlinear Hebbian Learning is the underlying algorithm driving RF formation across sensory modalities.
+% (They show sparse coding and (maybe?) vanilla MSE gradient descent are special cases of this, and come up with a metric for whether a given nonlinearity will localize. The motivation is not super analytically precise, relying on intuitions about kurtosis, but it seems to kind of work. Cool stuff!)
+% This implies, as they note, that it's the underlying statistics of the sensory input that drive the nature of the RFs.
+% However, they are not addressing whether an RF is localized, but rather what the already-localized RF looks like.
+
+
+% do not characterize what those statistics are.
+
+% It is typically asserted 
+
+% Is the idea, then, to propose vanilla gradient descent as sufficient, but only for specific distributions?
+
+\subsection*{Summary}
+In summary, there are three main concerns I have with how to position our current work:
+\begin{enumerate}
+    \item We presently only have sufficient conditions for localization (marginal concentration) and a negative result (elliptical distributions do not localize).
+    There might be a way to sharpen this distinction, but I haven't made this precise yet.
+    \item I don't think we can produce the full variety of RFs observed in V1 using \emph{this data model}.
+    Specifically, yielding both cosine- and sine-phase RFs, and the variety of orientations.
+    Based on some preliminary experiments, it does seem possible to achieve a variety of spatial frequencies by having the data be a mixture of many frequencies, instead of just two.
+    However, it is not clear how to achieve a variety of orientations.
+    \item Our setting is not biologically plausible. 
+    First we use a synthetic data model, and it is not clear that we can extend this to a setting where we use natural images without additional regularization (see \cite{redman2023sparsity}).
+    To do this, we'd also need to make the jump from supervised to unsupervised learning.
+    This might be possible without our current data model, but it's not clear how that this should work in a more general setting.
+    Furthermore, in the setting of natural images, it's not clear how the analysis we have so far would be relevant.
+\end{enumerate}
+
+I am continuing to work on item 1.
+However, I feel that if we could come up with tighter positive and negative results for localization, that might even be best as a standalone paper, or at least to have that be the main contribution of the paper, rather than try to establish some connection back to V1.
+
+Andrew floated directional derivatives as a way to get a variety of orientations among RFs to address item 2.
+However, I am not really sure how to implement this, or what it would mean to a neuroscientist.
+\emph{It might be best to discuss this with Andrew again.}
+
+Regarding relevance to a neuroscientist, we still have the issue of item 3.
+To make any neuroscientist find meaning in our work, we need to move away from the toy model and towards a more biologically plausible, as seems to be standard in many of the works I've read.
+

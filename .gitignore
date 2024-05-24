@@ -8,6 +8,10 @@ wandb/*
 localization/torch_version/weights/
 localization/torch_version/weights_OLD/
 localization/results/weights/
+*.pdf
+*.png
+*.npy
+*.mat
 
 **/.DS_Store
 

@@ -1,4 +1,5 @@
 import numpy as np
+import jax
 import jax.numpy as jnp
 
 def build_gaussian_covariance(n, xi):
@@ -18,6 +19,24 @@ def build_non_gaussian_covariance(n, xi, g):
     Z = lambda g: jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) ) )
     C = 2/jnp.pi/(Z(g)**2) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) * C )
     return C
+
+def build_sine_covariance(n, xi):
+    C = jnp.abs(jnp.tile(jnp.arange(n)[:, jnp.newaxis], (1, n)) - jnp.tile(jnp.arange(n), (n, 1)))
+    C = jnp.minimum(C, n - C)
+    C = jnp.exp(-C ** 2 / (xi ** 2)) * jnp.sin((n // 2) * C)
+    return C
+
+def build_ising_covariance(n, xi):
+    d = jnp.abs(jnp.tile(jnp.arange(n)[:, jnp.newaxis], (1, n)) - jnp.tile(jnp.arange(n), (n, 1)))
+    a = jnp.tanh(xi)
+    C = (a ** d) / (1 + a ** n) + (a ** -d) / (1 + a ** -n)
+    return C
+
+def build_pre_gaussian_covariance(C, g):
+    Z = lambda g: jnp.sqrt( (2/jnp.pi) * jnp.arcsin( (2*g**2) / (1 + (2*g**2)) ) )
+    C = jnp.sin( Z(g)**2 * jnp.pi/2 * C ) * (1 + (2*g**2)) / (2*g**2)
+    return C
+    
 
 def gabor_real(c, b, a, x0, k0, x):
     n = len(x)
@@ -68,7 +87,7 @@ def gabor_imag(c, b, a, x0, k0, x, n):
     d = jnp.minimum(x-x0, n - (x-x0))
     return -c * jnp.sin(k0 * d) * jnp.exp(-d ** 2 / a ** 2) + b
 
-def build_DRT(n):
+def build_DRT(n, d=1):
   DFT = jnp.zeros((n, n), dtype=complex)
   w = jnp.exp(-2 * jnp.pi * 1j / n)
   for i in range(DFT.shape[0]):
@@ -84,4 +103,29 @@ def build_DRT(n):
   DRT = DRT.at[:,0].set(DRT_[:,0])
   DRT = DRT.at[:,1::2].set(DRT_[:,1:n//2+1])
   DRT = DRT.at[:,2::2].set(DRT_[:,n//2+1:])
+  
+  if d == 1:
+    return DRT
+
+  # Kroecker product to get
+  DRT_ = DRT
+  for _ in range(d-1):
+    DRT = jnp.kron(DRT, DRT_)
   return DRT
+
+def iterate_kron(A, d):
+  A_ = A
+  for _ in range(d-1):
+    A = jnp.kron(A, A_)
+  return A
+
+
+# marginal adjustment functions
+def normal_adjust(key, n):
+    return jax.random.normal(key, (n,))
+
+def uniform_adjust(key, n):
+    return jax.random.uniform(key, (n,), minval=-jnp.sqrt(3), maxval=jnp.sqrt(3))
+
+def no_adjust(key, n):
+    return jnp.ones((n,))

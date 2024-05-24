@@ -30,8 +30,7 @@ class TDataset(Dataset):
   def __init__(
     self,
     key: Array,
-    xi1: float = 0.1,
-    xi2: float = 1.1,
+    xi: tuple[float] = (0.1, 1.1),
     df: float = 3.,
     class_proportion: float = 0.5,
     num_dimensions: int = 100,
@@ -69,37 +68,48 @@ class TDataset(Dataset):
       sqrt_C = self.DRT @ jnp.diag(jnp.sqrt(jnp.maximum(evals, 0))) @ self.DRT.T
       
       normal_key, chi_key = jax.random.split(key)
-      z_id = jax.random.normal(key, (L,))
+      z_id = jax.random.normal(normal_key, (L,))
       normal_samples = sqrt_C @ z_id
       chi2_samples = jax.random.chisquare(chi_key, df)
       x = normal_samples / jnp.sqrt(chi2_samples / df)
       return x
     
-    self.generate_xi1 = jax.jit(
-      jax.vmap(
-        partial(generate_t,
-                xi=xi1, L=num_dimensions, df=df,
-                ),
-      )
-    )
+    # self.generate_xi1 = jax.jit(
+    #   jax.vmap(
+    #     partial(generate_t,
+    #             xi=xi1, L=num_dimensions, df=df,
+    #             ),
+    #   )
+    # )
     
-    self.generate_xi2 = jax.jit(
-      jax.vmap(
-        partial(generate_t,
-                xi=xi2, L=num_dimensions, df=df,
-                ),
+    # self.generate_xi2 = jax.jit(
+    #   jax.vmap(
+    #     partial(generate_t,
+    #             xi=xi2, L=num_dimensions, df=df,
+    #             ),
+    #   )
+    # )
+    
+    self.num_classes = len(xi)
+    self.generate_xi = [None for _ in range(self.num_classes)]
+    for i, xi in enumerate(xi):
+      self.generate_xi[i] = jax.jit(
+        jax.vmap(
+          partial(generate_t,
+                  xi=xi, L=num_dimensions, df=df,
+                  ),
+        )
       )
-    )
     
     # Adjust support
     # z = Z(gain)
-    # self.adjust_support = jax.jit(
+    # self.adjust = jax.jit(
     #   jax.vmap(
     #     partial(lambda x, support: (x * z + 1) * (support[1] - support[0]) / 2 + support[0],
     #             support=support)
     #     )
     # )
-    self.adjust_support = lambda x: x
+    self.adjust = lambda x: x
 
   @property
   def exemplar_shape(self) -> tuple[int]:
@@ -123,22 +133,36 @@ class TDataset(Dataset):
       index = jnp.array(index)
       n = index.shape[0]
 
-    keys = jax.vmap(jax.random.fold_in, in_axes=(None, 0))(self.key, index)
-    if isinstance(index, int):
-      keys = jnp.expand_dims(keys, axis=0)
+    # keys = jax.vmap(jax.random.fold_in, in_axes=(None, 0))(self.key, index)
+    # if isinstance(index, int):
+    #   keys = jnp.expand_dims(keys, axis=0)
         
-    # generate xi1 and xi2
-    xi1 = self.generate_xi1(key=keys)
-    xi2 = self.generate_xi2(key=keys)
-    # concatenate xi1 and xi2
-    exemplars = jnp.concatenate((xi1, xi2), axis=0)
-    labels = jnp.concatenate((jnp.ones(n), jnp.zeros(n)), axis=0)
+    # # generate xi1 and xi2
+    # xi1 = self.generate_xi1(key=keys)
+    # xi2 = self.generate_xi2(key=keys)
+    # # concatenate xi1 and xi2
+    # exemplars = jnp.concatenate((xi1, xi2), axis=0)
+    # labels = jnp.concatenate((jnp.ones(n), jnp.zeros(n)), axis=0)
+    # # subsample
+    # perm = jax.random.permutation(keys[0], exemplars.shape[0])
+    # exemplars = exemplars[perm[:n]]
+    # labels = labels[perm[:n]]
+    
+    class_keys = jax.random.split(self.key, self.num_classes)
+    fold_in = jax.vmap(jax.random.fold_in, in_axes=(None, 0))
+    keys = [ fold_in(class_key, index) for class_key in class_keys ]
+    if isinstance(index, int):
+      keys = [ jnp.expand_dims(keys_, axis=0) for keys_ in keys ]
+        
+    # generate exemplars and labels
+    exemplars = jnp.concatenate([ self.generate_xi[i](key=keys_) for i, keys_ in enumerate(keys) ], axis=0)
+    labels = jnp.concatenate([ i * jnp.ones(n) for i in range(self.num_classes) ], axis=0)
     # subsample
-    perm = jax.random.permutation(keys[0], exemplars.shape[0])
+    perm = jax.random.permutation(class_keys[0], exemplars.shape[0])
     exemplars = exemplars[perm[:n]]
     labels = labels[perm[:n]]
     # adjust support
-    exemplars = self.adjust_support(exemplars)
+    # exemplars = self.adjust(exemplars)
 
     if isinstance(index, int):
       exemplars = exemplars[0]
@@ -149,9 +173,9 @@ class TDataset(Dataset):
 
 if __name__ =="__main__":
     key = jax.random.PRNGKey(0)
-    xi1, xi2, df = 5, 5, 5
-    print("xi1, xi2, gain:", xi1, xi2, df)
-    dataset = TDataset(key=key, xi1=xi1, xi2=xi2, df=df, num_dimensions=40, num_exemplars=100000)
+    xi, df = (5, 5), 5
+    print("xi, gain:", xi, df)
+    dataset = TDataset(key=key, xi=xi, df=df, num_dimensions=40, num_exemplars=100000)
     x, y = dataset[:100000]
     xx = (x.T @ x) / len(x)
     

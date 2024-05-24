@@ -1,0 +1,330 @@
+\documentclass[usletter,twoside,12pt]{book}
+% \usepackage[tc]{titlepic}
+\usepackage{math}
+
+\title{Internship Recap}
+\author{Leon Lufkin}
+\date{\today}
+
+% \makeatletter
+% \let\Title\@title
+% \let\Author\@author
+% \let\Date\@date
+
+\begin{document}
+
+% \begin{titlepage}
+% \begin{center}
+%    {\huge\bfseries Deep Linear Nets \\}
+%    % ----------------------------------------------------------------
+%    \vspace{1.5cm}
+%    {\Large\bfseries Leon Lufkin}\\[5pt]
+%    % Taught by Professor Wilhelm Schlag\\[14pt]
+%       % ----------------------------------------------------------------
+%    \vspace{2cm}
+%    {Taught as Math 325/525 by Professor Wilhelm Schlag \\ at Yale University} \\[5pt]
+%    % \emph{{Your University}}\\[2cm]
+%    % {in partial fulfilment for the award of the degree
+%    % of} \\[2cm]
+%    % \textsc{\Large{{Doctor of Philosophy}}} \\[5pt]
+%    % {in some subject} \vspace{0.4cm} \\[2cm]
+%    % {By}\\[5pt] {\Large \sc {Me}}
+%    \vfill
+%    % ----------------------------------------------------------------
+%    % \includegraphics[width=0.19\textwidth]{example-image-a}\\[5pt]
+%    % {Department of Subject}\\[5pt]
+%    % {Address line -- 2}\\[5pt]
+%    % {Address line -- 4,
+%    % INDIA}\\
+%    \vfill
+%    {Spring 2023}
+%    \end{center}
+% \end{titlepage}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Introduction: Emergent Structure %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Emergent Structure}
+
+\section{In the Brain}
+
+\section{In Neural Nets}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%% A Minimal Example %%
+%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{A Minimal Example}
+
+\section{[IG22]}
+
+\begin{itemize}
+   \item Explain the task
+   \item Break down the phenomena 
+\end{itemize}
+
+\section{Extensions}
+
+\begin{itemize}
+   \item More data distributions
+   \item Neuroscience? 
+   \item Talk about both of these more later.
+\end{itemize}
+
+
+%%%%%%%%%%%%%%
+%% Dynamics %%
+%%%%%%%%%%%%%%
+\chapter{Dynamics}
+
+\section{Symmetry Breaking}
+
+\section{Tiling}
+
+\section{Localization: [IG22]}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Localization: Our Work
+\section{Localization: Our Work}
+
+%% ReLU
+\subsection{ReLU}
+We have
+\begin{align}
+   2 \tau \frac{d}{dt} w &= \underbrace{\E_{X \mid Y=1} \left[ \mathbbm{1}(\langle w, X \rangle \geq 0) X \right]}_{\triangleq f(w)} - \frac{1}{2} \left( \Sigma_0 + \Sigma_1 \right) w.
+\end{align}
+Focusing on the $i$-th entry of $f$,
+\begin{align}
+   f(w)_i &= \E_{X_i \mid Y=1} \left[ \E_{X \mid X_i, Y=1} \left[ \mathbbm{1}(\langle w, X \rangle \geq 0) \right] X_i \right] \\
+   &= \E_{X_i \mid Y=1} \left[ \mathbb{P}_{X \mid X_i, Y=1} \left( \langle w, X \rangle \geq 0 \right) X_i \right].
+\end{align}
+Approximating $X \mid X_i, Y=1$ by a Gaussian with the same mean and covariance, we acquire an error term $\eps(w)$ and write the above as
+\begin{align}
+   f(w)_i &= \E_{X_i \mid Y=1} \left[ \left( \Phi \left( \frac{ \langle \mu_{\mid X_i}, w \rangle }{ \sqrt{ \langle \Sigma_{\mid X_i} w, w \rangle } } \right) - \frac{1}{2} \right) X_i \right] + \eps(w) \\
+   &= \E_{X_i \mid Y=1} \left[ \operatorname{erf} \left( \frac{1}{\sqrt{2}} \cdot \frac{ \langle \mu_{\mid X_i}, w \rangle }{ \sqrt{ \langle \Sigma_{\mid X_i} w, w \rangle } } \right) X_i \right] + \eps(w).
+\end{align}
+In practice, this lets us capture the early phase of localization quite well in the limit as $g \to \infty$.
+Why?
+(I will try to answer this later.)
+
+What do $\mu_{\mid X_i}$ and $\Sigma_{\mid X_i}$ look like?
+If $X$ is Gaussian, then $\mu_{\mid X_i} = X_i \sigma_i^1$, while $\Sigma_{\mid X_i} = \Sigma_1 - (\sigma_i^1) (\sigma_i^1)^\top$.
+In the limit as $g \to \infty$, we can again show that $\mu_{\mid X_i} = X_i \sigma_i^1$ and $\Sigma_{\mid X_i} = \Sigma_1 - (\sigma_i^1) (\sigma_i^1)^\top$.
+So, in the two limiting cases for $g$, the conditional mean and covariance are the same.
+This suggests that such a property may hold more generally, but I don't know how to prove this.
+We can make some statements, though.
+
+For the conditional mean, we can write
+\begin{align}
+   \sigma_i^1 &= \E_{X}[ X_i X ] 
+   = \E_{X_i}[ X_i \E_{X \mid X_i}[ X ] ]
+   = \E_{X_i}[ X_i \mu_{\mid X_i} ].
+\end{align}
+It makes a lot of sense that $\mu_{\mid X_i} = X_i k$ for some vector $k$.
+(But surely this need not always be true, right?)
+If we assume this form, then from the above we must have $k = \sigma_i^1$, since $X_i$ has variance 1.
+
+For the conditional covariance, let us first recall its definition,
+\begin{align}
+   \Sigma_{\mid X_i}
+   &= \E_{X \mid X_i}[ X X^\top ] - (\mu_{\mid X_i}) (\mu_{\mid X_i})^\top.
+\end{align}
+% Then,
+% \begin{align}
+%    (\Sigma_{\mid X_i})_{jk} &= \E_{X \mid X_i}[ X_j X_k ] - (\mu_{\mid X_i})_j (\mu_{\mid X_i})_k
+%    % = X_i (\mu_{\mid X_i})_j - (\mu_{\mid X_i})_i (\mu_{\mid X_i})_j \\
+%    % &= (X_i - (\mu_{\mid X_i})_i) (\mu_{\mid X_i})_j.
+% \end{align}
+Then,
+\begin{align}
+   (\Sigma_{\mid X_i})_{ij} &= \E_{X \mid X_i}[ X_i X_j ] - (\mu_{\mid X_i})_i (\mu_{\mid X_i})_j \\
+   &= X_i (\mu_{\mid X_i})_j - (\mu_{\mid X_i})_i (\mu_{\mid X_i})_j \\
+   &= (X_i - (\mu_{\mid X_i})_i) (\mu_{\mid X_i})_j \\
+   &= 0.
+\end{align}
+That is, the $i$-th row (and column) of $\Sigma_{\mid X_i}$ \emph{is always zero}.
+This means that our approximation of $X$ by a Gaussian is perfect for the $i$-th entry.
+Presumably, the $i$-th row and column being zero means that nearby entries in the conditional covariance are small, specifically those where $\mu_{\mid X_i}$ is non-zero.
+Again, this suggests a Gaussian approximation is reasonable.
+
+% We can also write
+% \begin{align}
+%    \E_{X_i} \left[ (\Sigma_{\mid X_i})_{:j} \right]
+%    &= \sigma_i^1.
+% \end{align}
+
+For now, \textbf{let us conjecture that $\mu_{\mid X_i} = X_i \sigma_i^1$ and $\Sigma_{\mid X_i} = \Sigma_1 - (\sigma_i^1) (\sigma_i^1)^\top$ holds}.
+Then, we can write
+\begin{align}
+   % 2 \tau \frac{d}{dt} w &= \E_{X_i \mid Y=1} \left[ \operatorname{erf} \left( \frac{1}{\sqrt{2}} \cdot \frac{ \langle \sigma_i^1, w \rangle }{ \sqrt{ \langle (\Sigma_1 - (\sigma_i^1) (\sigma_i^1)^\top) w, w \rangle } } X_i \right) X_i \right] - \frac{1}{2} \langle \sigma_i^0 + \sigma_i^1, w \rangle + \eps(w).
+   f(w)_i &= \E_{X_i \mid Y=1} \left[ \operatorname{erf} \left( \frac{1}{\sqrt{2}} \cdot \frac{ \langle \sigma_i^1, w \rangle }{ \sqrt{ \langle (\Sigma_1 - (\sigma_i^1) (\sigma_i^1)^\top) w, w \rangle } } X_i \right) X_i \right].
+\end{align}
+Define the algebraic sigmoid function $\operatorname{alg}(x) = \frac{x}{\sqrt{1+x^2}}$.
+Then,
+\begin{align}
+   f(w)_i &= \E_{X_i \mid Y=1} \left[ \operatorname{erf} \left( \frac{1}{\sqrt{2}} \operatorname{alg}^{-1}\left( \frac{\langle \sigma_i^1, w \rangle}{\langle \Sigma_1 w, w \rangle} X_i \right) \right) X_i \right] + \eps(w).
+\end{align}
+Defining the map $\Upsilon : (-1,1) \to \R$ via
+\begin{align}
+   \Upsilon_p(a) = \E_{X_i \sim p} \left[ \operatorname{erf} \left( \frac{1}{\sqrt{2}} \operatorname{alg}^{-1}\left( a X_i \right) \right) X_i \right],
+\end{align}
+where $p$ is the distribution of $X_i \mid Y=1$, we write
+\begin{align}
+   f(w)_i &= \Upsilon_p \left( \frac{\langle \sigma_i^1, w \rangle}{\langle \Sigma_1 w, w \rangle} \right) + \eps(w).
+\end{align}
+
+For small values of $a$, $\Upsilon_p(a) \approx \sqrt{\frac{2}{\pi}} \sigma^2 a$, where $\sigma^2$ is the variance of $X_i \sim p$.
+If $p$ is Gaussian with mean zero, then this holds for all $a$, that is $\Upsilon_p(a) = \sqrt{\frac{2}{\pi}} \sigma^2 a$.
+When $p$ is concentrated on $\pm 1$, $\Upsilon_p(a) = \operatorname{erf} \left( \frac{1}{\sqrt{2}} \operatorname{alg}^{-1}\left( a \right) \right)$, which dominates $\sqrt{\frac{2}{\pi}} \sigma^2 a$ for all positive $a$, especially for $a$ larger than about 0.3.
+This suggests that the phenomenon of localization boils down to whether $\Upsilon_p$ dominates $\sqrt{\frac{2}{\pi}} \sigma^2 a$ for larger $a$.
+
+What can we say about $\Upsilon_p$ in general?
+First, we need to impose some niceness conditions on $p$.
+We already require that our data be symmetric about 0, translation invariant, and have a localized covariance.
+However, we also want to make sure that our Gaussian approximation is reasonable.
+A counterexample is a distribution that has an atom at zero and is otherwise nice.
+Symmetry about 0, translation invariance, and a localized covariance are all satisfied, but the Gaussian approximation is not reasonable when the sampled random vector is zero.
+More generally, we don't want $\langle w, X \rangle \mid X_i$ to be zero\footnote{or any constant?} with positive probability for any $w$.
+(Well, some $w$'s are always bad, but we never encounter those so we don't care.
+Which $w$'s are bad, and which do we care about?)
+
+If $X_i$ is bounded (which it must be if it has variance 1), then $\Upsilon_p$ is continuous on $(-1,1)$ (not sure about endpoints, since it's not even technically defined there in the high-gain case, but it should be $\pm 1$ then).
+By DCT, I think we also get infinite differentiability (maybe??).
+
+What I'm really interested in, though, is monotonicity w.r.t. $a \mapsto \sqrt{\frac{2}{\pi}} \sigma^2 a$.
+
+Let's assume that $w$ and $p$ are such that $\langle w, X \rangle \mid X_i$ is never exactly zero with positive probability.
+
+
+To understand how $\Upsilon_p$ affects localization, we can plug in various functions that satisfy $\Upsilon_p(a) \approx \sqrt{\frac{2}{\pi}} a$ for small $a$.
+Some examples and their results:
+\begin{enumerate}
+   \item $\sqrt{\frac{2}{\pi}} x e^{0.1 |x|}$ (strongly dominates) $\implies$ localized
+   \item $\sqrt{\frac{2}{\pi}} x e^{0.01 |x|}$ (weakly dominates) $\implies$ oscillatory
+\end{enumerate}
+Define the piecewise linear function
+\begin{align}
+   P_m(x) &= 
+   \begin{cases} 
+      \sqrt{\frac{2}{\pi}} x & \abs{x} \leq \frac{1}{2} \\ 
+      m x + \operatorname{sign}(x) \left( \sqrt{\frac{1}{2\pi}}-\frac{m}{2} \right) & \frac{1}{2} < \abs{x} \leq 1
+   \end{cases}.
+\end{align}
+\begin{enumerate}
+   \item[3.] $P_{m=0.93}(x)$ (mildly dominates) $\implies$ localized
+   \item[4.] $P_{m=0.92}(x)$ (weakly dominates) $\implies$ oscillatory
+\end{enumerate}
+(Note how ridiculously small the difference between 3 and 4 is.
+I'm surprised there is such a sharp threshold for the functional form given by $P_m$.
+% I think this is because 
+Localization is much more continuous with the exponential function form in 1 and 2.)
+
+
+
+
+%% General activation
+\subsection{General activation}
+How can we make an argument about more general activation functions $\sigma$?
+Let us consider a fixed bias term $b$.
+Using the same formulation,
+\begin{align}
+   \tau \frac{d}{dt} w &= \underbrace{ \E_{X \mid Y=1} \left[ \sigma'( \langle w, X \rangle - b ) X \right] }_{\equiv f(w)} - \E_{X, Y} \left[ 2 \sigma(\langle w, X \rangle - b) \sigma'( \langle w, X \rangle - b ) X \right].
+\end{align}
+Again, the first term is the only one that changes if we swap class labels.
+So, it must be the term driving localization.
+Focusing on the $i$-th entry of $f$,
+\begin{align}
+   f(w)_i &= \E_{X_i \mid Y=1} \left[ \E_{X \mid X_i, Y=1} \left[ \sigma'( \langle w, X \rangle - b ) \right] X_i \right].
+\end{align}
+Assuming $X_i$ concentrates on $\pm 1$,
+\begin{align}
+   2 f(w)_i &= \E_{X \mid X_i=1, Y=1} \left[ \sigma'( \langle w, X \rangle - b ) \right] - \E_{X \mid X_i=-1, Y=1} \left[ \sigma'( \langle w, X \rangle - b ) \right].
+\end{align}
+
+In what sense is this like the ReLU case?
+If $\sigma(x) = \operatorname{erf}(\frac{x}{\sqrt{2}})$,
+\begin{align}
+   \E_{X \mid X_i=1, Y=1} \left[ \sigma'( \langle w, X \rangle - b ) \right]
+   &= \E_{X \mid X_i=1, Y=1} \left[ \exp\left( -\frac{1}{2} ( \langle w, X \rangle - b )^2 \right) \right].
+\end{align}
+\begin{enumerate}
+   \item If $w$ is localized at $i$, and of appropriate scale and sign, then this term is approximately 1; the expectation conditioning on $X_i = -1$ is small, so $f(w)_i \approx 1$. 
+   \item If $w$ is localized at $i$, of appropriate sign but incorrectly large scale, then it this term is small and near 0; the expectation conditioning on $X_i = -1$ behaves similarly, so $f(w)_i \approx 0$.
+   \item If $w$ is localized at $i$, of appropriate sign but incorrectly small scale, then it this term is small and near $e^{-\frac{1}{2}b^2}$the expectation conditioning on $X_i = -1$ behaves similarly, so $f(w)_i \approx 0$.
+   \item If $w$ is localized somewhere other than $i$, then the expectation is invariant to conditioning on $X_i = 1$ or $X_i = -1$, so $f(w)_i \approx 0$.
+   \item If $w$ is just noise, can we say anything? We try this below.
+\end{enumerate}
+Using a Gaussian approximation for $X \mid X_i, Y=1$, $Z \equiv \langle w, X \rangle - b \sim \NN( \langle w, \mu_{\mid X_i=1} \rangle - b, \langle \Sigma_{\mid X_i=1} w, w \rangle )$.
+Let $\mu_Z$ and $\sigma_Z^2$ be the mean and variance of $Z$.
+Then, the approximate expectation is
+\begin{align}
+   &\int_{\R} \frac{1}{\sqrt{2 \pi} \sigma_Z} \exp\left( -\frac{1}{2} \left( \frac{z - \mu_Z}{\sigma_Z} \right)^2 \right) \exp\left( -\frac{1}{2} z^2 \right) dz \\
+   &= \int_{\R} \frac{1}{\sqrt{2 \pi} \sigma_Z} \exp\left( -\frac{1}{2} \left[ \left( \frac{z - \mu_Z}{\sigma_Z} \right)^2 + z^2 \right] \right) dz \\
+   &= \int_{\R} \frac{1}{\sqrt{2 \pi} \sigma_Z} \exp\left( -\frac{1}{2 \sigma_Z^2} \left[ \left(z - \mu_Z \right)^2 + z^2 \sigma_Z^2 \right] \right) dz \\
+\end{align}
+Note
+\begin{align*}
+   \left(z - \mu_Z \right)^2 + z^2 \sigma_Z^2
+   &= z^2 - 2 \mu_Z z + \mu_Z^2 + z^2 \sigma_Z^2
+   = (\sigma_Z^2 + 1) z^2 - 2 \mu_Z z + \mu_Z^2 \\
+   &= (\sigma_Z^2 + 1) \left[ z^2 - 2 \frac{ \mu_Z }{ \sigma_Z^2 + 1 } z \right] + \mu_Z^2 
+   = (\sigma_Z^2 + 1) \left[ z - \frac{ \mu_Z }{ \sigma_Z^2 + 1 } \right]^2 + \frac{ \sigma_Z^2 }{ \sigma_Z^2 + 1 } \mu_Z^2.
+\end{align*}
+Plugging this back in,
+\begin{align}
+   &\int_{\R} \frac{1}{\sqrt{2 \pi} \sigma_Z} \exp\left( -\frac{1}{2} \left( \frac{z - \mu_Z}{\sigma_Z} \right)^2 \right) \exp\left( -\frac{1}{2} z^2 \right) dz \\
+   &= \int_{\R} \frac{1}{\sqrt{2 \pi} \sigma_Z} \exp\left( -\frac{1}{2 \sigma_Z^2} \left[ (\sigma_Z^2 + 1) \left[ z - \frac{ \mu_Z }{ \sigma_Z^2 + 1 } \right]^2 + \frac{ \sigma_Z^2 }{ \sigma_Z^2 + 1 } \mu_Z^2 \right] \right) dz \\
+   &= \frac{1}{\sqrt{\sigma_Z^2 + 1}} \exp\left( -\frac{ \mu_Z^2 }{ 2 (\sigma_Z^2 + 1) } \right) \int_{\R} \frac{1}{\sqrt{2 \pi} \sqrt{ \frac{\sigma_Z^2}{\sigma_Z^2 + 1} }} \exp\left( -\frac{1}{2 \frac{\sigma_Z^2}{\sigma_Z^2 + 1} } \left[ \left( z - \frac{ \mu_Z }{ \sigma_Z^2 + 1 } \right)^2 \right] \right) dz \\
+   &= \frac{1}{\sqrt{\sigma_Z^2 + 1}} \exp\left( -\frac{ \mu_Z^2 }{ 2 (\sigma_Z^2 + 1) } \right).
+\end{align}
+Thus,
+\begin{align}
+   \E_{X \mid X_i=1, Y=1} \left[ \sigma'( \langle w, X \rangle - b ) \right]
+   &\approx \frac{1}{\sqrt{\langle \Sigma_{\mid X_i=1} w, w \rangle + 1}} \exp\left( -\frac{ (\langle w, \mu_{\mid X_i=1} \rangle - b)^2 }{ 2 (\langle \Sigma_{\mid X_i=1} w, w \rangle + 1) } \right).
+\end{align}
+When the marginals concentrate,
+\begin{align}
+   \E_{X \mid X_i=1, Y=1} \left[ \sigma'( \langle w, X \rangle - b ) \right]
+   &\approx \frac{1}{\sqrt{ w^\top \Sigma_1 w - ( \langle \sigma_i^1, w \rangle )^2 + 1}} \exp\left( -\frac{ (\langle w, \sigma_i^1 \rangle - b)^2 }{ 2 (w^\top \Sigma_1 w - ( \langle \sigma_i^1, w \rangle )^2 + 1) } \right).
+\end{align}
+
+
+
+\section{Predictions: Our Work}
+
+
+%%%%%%%%%%%%%%%%
+%% Optimality %%
+%%%%%%%%%%%%%%%%
+\chapter{Optimality}
+
+Why do non-Gaussian-trained RFs perform better in both settings?
+
+What does this say about gradient descent?
+
+\section{}
+
+
+%%%%%%%%%%%%%%%%%%%%%
+%% Modeling Vision %%
+%%%%%%%%%%%%%%%%%%%%%
+\chapter{Modeling Vision}
+
+\section{LGN}
+
+\section{V1}
+
+\section{Sparse-coding}
+
+\section{CNNs}
+
+
+
+
+
+
+
+
+
+
+\end{document}

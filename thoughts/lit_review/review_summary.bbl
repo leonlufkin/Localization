@@ -1,0 +1,68 @@
+\newcommand{\etalchar}[1]{$^{#1}$}
+\begin{thebibliography}{HTCM20}
+
+\bibitem[BG16]{brito2016nonlinear}
+Carlos~SN Brito and Wulfram Gerstner.
+\newblock Nonlinear hebbian learning as a unifying principle in receptive field
+  formation.
+\newblock {\em PLoS computational biology}, 12(9):e1005070, 2016.
+
+\bibitem[ESB09]{eichhorn2009natural}
+Jan Eichhorn, Fabian Sinz, and Matthias Bethge.
+\newblock Natural image coding in v1: how much use is orientation selectivity?
+\newblock {\em PLoS computational biology}, 5(4):e1000336, 2009.
+
+\bibitem[Gar88]{gardner1988space}
+Elizabeth Gardner.
+\newblock The space of interactions in neural network models.
+\newblock {\em Journal of physics A: Mathematical and general}, 21(1):257,
+  1988.
+
+\bibitem[HTCM20]{harsh2020place}
+Moshir Harsh, J{\'e}r{\^o}me Tubiana, Simona Cocco, and Remi Monasson.
+\newblock ‘place-cell’emergence and learning of invariant data with
+  restricted boltzmann machines: breaking and dynamical restoration of
+  continuous symmetries in the weight space.
+\newblock {\em Journal of Physics A: Mathematical and Theoretical},
+  53(17):174002, 2020.
+
+\bibitem[IG22]{ingrosso2022data}
+Alessandro Ingrosso and Sebastian Goldt.
+\newblock Data-driven emergence of convolutional structure in neural networks.
+\newblock {\em Proceedings of the National Academy of Sciences},
+  119(40):e2201854119, 2022.
+
+\bibitem[OF96]{olshausen1996emergence}
+Bruno~A Olshausen and David~J Field.
+\newblock Emergence of simple-cell receptive field properties by learning a
+  sparse code for natural images.
+\newblock {\em Nature}, 381(6583):607--609, 1996.
+
+\bibitem[PB22]{pellegrini2022neural}
+Franco Pellegrini and Giulio Biroli.
+\newblock Neural network pruning denoises the features and makes local
+  connectivity emerge in visual tasks.
+\newblock In {\em International Conference on Machine Learning}, pages
+  17601--17626. PMLR, 2022.
+
+\bibitem[RWIG23]{redman2023sparsity}
+William~T Redman, Zhangyang Wang, Alessandro Ingrosso, and Sebastian Goldt.
+\newblock Sparsity enhances non-gaussian data statistics during local receptive
+  field formation.
+\newblock In {\em Conference on Parsimony and Learning (Recent Spotlight
+  Track)}, 2023.
+
+\bibitem[SBM{\etalchar{+}}11]{saxe2011modeling}
+A~Saxe, Maneesh Bhand, Ritvik Mudur, Bipin Suresh, and A~Ng.
+\newblock Modeling cortical representational plasticity with unsupervised
+  feature learning.
+\newblock {\em Poster presented at COSYNE}, pages 24--27, 2011.
+
+\bibitem[ZMD11]{zylberberg2011sparse}
+Joel Zylberberg, Jason~Timothy Murphy, and Michael~Robert DeWeese.
+\newblock A sparse coding model with synaptically local plasticity and spiking
+  neurons can account for the diverse shapes of v1 simple cell receptive
+  fields.
+\newblock {\em PLoS computational biology}, 7(10):e1002250, 2011.
+
+\end{thebibliography}

@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 # from scipy.stats import entropy as scipy_entropy
 # from localization.utils.measurement import 
 
+import ipdb
+
 #########################
 # VISUALIZATION FUNCTIONS
 
@@ -16,7 +18,7 @@ def plot_receptive_fields(weights: list, num_cols=None, evaluation_interval=500,
     
     # plot each set of weights
     fig, axs = plt.subplots(num_rows, num_cols, figsize=figsize)
-    axs_ = axs.flatten()
+    axs_ = axs.flatten() if isinstance(axs, np.ndarray) else np.array([axs])
     min_, max_ = np.min([np.min(weight_) for weight_ in weights]), np.max([np.max(weight_) for weight_ in weights])
     for i, (weight, ax) in enumerate(zip(weights, axs_)):
         ax.imshow(weight[reordering], cmap='gray', vmin=min_, vmax=max_)

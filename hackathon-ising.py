@@ -82,7 +82,7 @@ def simulate(key: Array, D: int, J: float):
 
 if __name__ == "__main__":
     D = 40
-    J = 1.0
+    J = 0.3 # 1.0
     key = jax.random.PRNGKey(0)
     final_state = simulate(key, D, J)
     print(final_state)
@@ -92,3 +92,14 @@ if __name__ == "__main__":
         jax.random.split(key, B), D, J
     )
     print(final_states)
+    
+    import matplotlib.pyplot as plt
+    x = final_states
+    xx = (x.T @ x) / len(x)
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
+    im = ax1.imshow(xx)
+    cbar = ax1.figure.colorbar(im, ax=ax1)
+    ax2.plot( xx[20] )
+    ax3.plot( x[:3].T )
+    fig.tight_layout()
+    fig.savefig(f'./thoughts/distributions/figs/experimental/ising_{J}.png')

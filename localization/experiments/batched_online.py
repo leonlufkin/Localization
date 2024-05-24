@@ -26,25 +26,45 @@ import jax.numpy as jnp
 import equinox as eqx
 import optax
 
-# from nets import datasets
-# export PYTHONPATH="${PYTHONPATH}:./"
 from localization import datasets
 # from nets import samplers
 from localization import samplers
 from localization import models
+from localization.utils import make_key
+from localization.models.feedforward import StopGradient
 
+import ipdb
+from jax.config import config
+config.update("jax_enable_x64", True)
+config.update("jax_debug_nans", True)
+
+def check_pred_y_1d(shape: tuple):
+  if len(shape) <= 1:
+    return True
+  if shape[-1] == 1:
+    return True
+  return False
 
 def accuracy(pred_y: Array, y: Array) -> Array:
   """Compute elementwise accuracy."""
   # print("accuracy: pred_y.shape=", pred_y.shape, "y.shape=", y.shape)
-  predicted_class = jnp.where(pred_y > 0.5, 1., 0.) # jnp.argx(pred_y, axis=-1)
+  # print(check_pred_y_1d(pred_y.shape))
+  # print('mean:', pred_y.mean())
+  predicted_class = jnp.where(pred_y > 0.5, 1., 0.) if check_pred_y_1d(pred_y.shape) else jnp.argmax(pred_y, axis=-1)
   return predicted_class == y
-
 
 def mse(pred_y: Array, y: Array) -> Array:
   """Compute elementwise mean squared error."""
+  if not check_pred_y_1d(pred_y.shape):
+    y = jax.nn.one_hot(y, pred_y.shape[-1])
   return jnp.square(pred_y - y)
 
+def ce(pred_y: Array, y: Array) -> Array:
+  """Compute elementwise cross-entropy loss."""
+  pred_y = jnp.exp(pred_y) / jnp.sum(jnp.exp(pred_y), axis=-1, keepdims=True)
+  y = jax.nn.one_hot(y, pred_y.shape[-1])
+  # jax.debug.print("ce: {pred_y}, {y}", pred_y=pred_y, y=y)
+  return -jnp.sum(y * jnp.log(pred_y), axis=-1)
 
 def batcher(sampler: Sequence, batch_size: int) -> Generator[Sequence, None, None]:
   """Batch a sequence of examples."""
@@ -54,12 +74,15 @@ def batcher(sampler: Sequence, batch_size: int) -> Generator[Sequence, None, Non
     yield sampler[i : min(i + batch_size, n)]
 
 @eqx.filter_value_and_grad
-def compute_loss(model: eqx.Module, x: Array, y: Array, key: Array) -> Array:
+def compute_loss(model: eqx.Module, x: Array, y: Array, key: Array, loss_fn: Callable) -> Array:
   """Compute cross-entropy loss on a single example."""
   keys = jax.random.split(key, x.shape[0])
   pred_y = jax.vmap(model)(x, key=keys)
   # import ipdb; ipdb.set_trace()
-  loss = mse(pred_y, y)
+  print(pred_y.shape, y.shape)
+  print(pred_y[0], y[0])
+  # loss = mse(pred_y, y) if check_pred_y_1d(pred_y.shape) else ce(pred_y, y)
+  loss = loss_fn(pred_y, y)
   # print(jnp.mean(jnp.abs(pred_y)).item())
   return loss.mean()
 
@@ -72,9 +95,10 @@ def train_step(
   x: Array,
   y: Array,
   key: Array,
+  loss_fn: Callable,
 ) -> tuple[Array, eqx.Module, Array]:
   """Train the model on a single example."""
-  loss, grads = compute_loss(model, x, y, key)
+  loss, grads = compute_loss(model, x, y, key, loss_fn)
   # print("grads l2 norm: ", jnp.linalg.norm(grads(x, key=key)))
   # print(grads)
   updates, opt_state = optimizer.update(grads, opt_state)
@@ -90,17 +114,26 @@ def eval_step(
   y: Array,
   key: Array,
   model: eqx.Module,
+  loss_fn: Callable,
 ) -> Mapping[str, Array]:
   """Evaluate the model on a single example-label pair."""
   # print(f"eval_step: x.shape={x.shape}, y.shape={y.shape}")
   pred_y = model(x, key=key)
+  # count number of nan in x
+  # jax.debug.print(f"{jnp.isnan(x).sum()}, {jnp.isnan(pred_y).sum()}")
+  # print(jnp.isnan(x).sum(), jnp.isnan(pred_y).sum())
 
   # Standard metrics.
+  # jax.debug.print("{pred_y}, {y}", pred_y=pred_y, y=y)
+  # ipdb.set_trace()
   elementwise_acc = accuracy(pred_y, y)
-  elementwise_loss = mse(pred_y, y)
+  print(pred_y.shape, y.shape)
+  elementwise_loss = loss_fn(pred_y, y) # mse(pred_y, y) if check_pred_y_1d(pred_y.shape) else ce(pred_y, y)
   
   # Track model internals.
   bias = model.fc1.bias
+  if isinstance(bias, StopGradient):
+    bias = bias.array
 
   d = {
     "loss": elementwise_loss.mean(),
@@ -153,28 +186,6 @@ def metrics_to_df(metrics: Mapping[str, Array]) -> pd.DataFrame:
 
 def log_to_wandb(metrics: Mapping[str, Array]) -> None:
   wandb.log(metrics)
-
-def interval_to_str(interval):
-  if isinstance(interval, tuple):
-    start, end = "[", "]"
-  else:
-    interval = (interval,)
-    start, end = "", ""
-  out = ",".join([ f"{x:05.2f}" for x in interval ])
-  return f"{start}{out}{end}"
-
-def make_key(dataset_cls, support, xi1, xi2, class_proportion, batch_size, num_epochs, learning_rate, model_cls, use_bias, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, gain=None, df=None, seed=0, **extra_kwargs):
-  dataset_name = dataset_cls.__name__
-  model_name = model_cls.__name__
-  if df is not None and gain is not None:
-    raise ValueError("Cannot specify both `df` and `gain`.")
-  return f'{dataset_name}{interval_to_str(support)}_xi1={interval_to_str(xi1)}_xi2={interval_to_str(xi2)}'\
-    f'{f"_gain={gain:.3f}" if gain is not None else ""}{f"_df={df}" if df is not None else ""}_p={class_proportion:.2f}'\
-    f'_batch_size={batch_size}_num_epochs={num_epochs}'\
-    f'_loss=mse_lr={learning_rate:.3f}'\
-    f'_{model_name}{"" if use_bias else "nobias"}_L={num_dimensions:03d}_K={num_hiddens:03d}_activation={activation.__name__ if isinstance(activation, Callable) else activation}'\
-    f'_init_scale={init_scale:.3f}_{init_fn.__name__ if isinstance(init_fn, Callable) else init_fn}'\
-    f'_seed={seed:d}'
   
 def evaluate(
   iteration: int,
@@ -183,6 +194,7 @@ def evaluate(
   model: eqx.Module,
   sampler: Sequence,
   batch_size: int,
+  loss_fn: Callable,
 ) -> pd.DataFrame:
   """Convenience function to evaluate `model` on batches from `sampler`."""
   metrics = {}
@@ -192,7 +204,7 @@ def evaluate(
 
   ### Behavioral metrics.
   # TODO(eringrant): Figure out the right syntax for `eqx.filter_vmap`.
-  _eval_step = jax.vmap(partial(eval_step, model=model), (0, 0, 0))
+  _eval_step = jax.vmap(partial(eval_step, model=model, loss_fn=loss_fn), (0, 0, 0))
 
   # Probing metric shapes.
   num_examples = len(sampler)
@@ -211,6 +223,9 @@ def evaluate(
 
   for i, (x, y) in enumerate(batcher(sampler, batch_size)):
     # (key,) = jax.random.split(key, 1)
+    print(x.shape, y.shape)
+    # count number of nan in x
+    print(jnp.isnan(x).sum())
     batch_metrics = _eval_step(x, y, jax.random.split(key, x.shape[0]))
     for metric_name in incremental_metrics.keys():
       incremental_metrics[metric_name][
@@ -246,20 +261,28 @@ def simulate(
   batch_size: int,
   num_epochs: int,
   # Dataset params.
-  xi1: tuple[float, float],
-  xi2: tuple[float, float],
+  # xi1: tuple[float, float],
+  # xi2: tuple[float, float],
+  xi: tuple[float],
   num_dimensions: int,
   class_proportion: float,
   # Default params.
   seed: int = 0,
-  dataset_cls: type[datasets.Dataset] = datasets.SinglePulseDataset,
-  support: tuple[float, float] = (0.0, 1.0),
+  dataset_cls: type[datasets.Dataset] = datasets.NonlinearGPDataset,
+  base_dataset: type[datasets.Dataset] = datasets.NonlinearGPDataset,
+  marginal_adjust: Callable = lambda key, n: jax.random.normal(key, (n,)),
+  dim: int = 1,
+  adjust: tuple[float, float] | Callable | None = None,
   gain: float | None = None,
+  num_steps : int = 1000,
   df: float | None = None,
   model_cls: type[eqx.Module] = models.MLP,
   use_bias = True,
+  bias_value = 0.0,
+  bias_trainable = True,
   init_fn: Callable = models.xavier_normal_init,
   optimizer_fn: Callable = optax.sgd,
+  loss_fn: str | Callable = 'mse',
   sampler_cls: type[samplers.Sampler] = samplers.OnlineSampler,
   wandb_: bool = False,
   save_: bool = True,
@@ -281,20 +304,39 @@ def simulate(
     activation=activation,
     model_cls=model_cls,
     use_bias=use_bias,
+    bias_value=bias_value,
+    bias_trainable=bias_trainable,
     optimizer_fn=optimizer_fn,
     learning_rate=learning_rate,
     batch_size=batch_size,
     num_epochs=num_epochs,
     dataset_cls=dataset_cls,
-    support=support,
-    xi1=xi1,
-    xi2=xi2,
+    adjust=adjust,
+    xi=xi,
     gain=gain,
+    dim=dim,
+    num_steps=num_steps,
     df=df,
     class_proportion=class_proportion,
     sampler_cls=sampler_cls,
-    init_fn=init_fn
+    init_fn=init_fn,
+    loss_fn=loss_fn,
   )
+  
+  # Determine size of output
+  if dataset_cls == datasets.NonlinearGPCountDataset:
+    out_features = 1
+  else:
+    out_features = 1 if len(xi) == 2 and loss_fn == 'mse' else len(xi)
+  # ipdb.set_trace()
+  if (model_cls == models.SimpleNet or out_features == 1) and not (loss_fn == 'mse'):
+    raise ValueError('loss must be mse if model_cls = SimpleNet or out_features = 1')
+  loss_fn = mse if loss_fn == 'mse' else ce if loss_fn == 'ce' else loss_fn
+  
+  if dataset_cls == datasets.AdjustMarginalDataset or dataset_cls == datasets.SymmBreakDataset:
+    config.update(dict(base_dataset=base_dataset, marginal_adjust=marginal_adjust))
+    if dataset_cls == datasets.SymmBreakDataset:
+      batch_size *= 100
   
   path_key = make_key(**config)
 
@@ -305,7 +347,7 @@ def simulate(
       wandb.init(
         project="gimme-intuition",
         group="debug",
-        name=make_key(**config),
+        name=path_key,
         notes=
         """
         Exploring variations in emergence of convolutional structure in fully-connected networks using the nonlinear Gaussian process and single pulse datasets.
@@ -338,18 +380,22 @@ def simulate(
   
   train_dataset = dataset_cls(
     key=train_dataset_key,
-    xi1=xi1, xi2=xi2, gain=gain,
-    class_proportion=class_proportion,
-    num_dimensions=num_dimensions,
+    # xi1=xi1, xi2=xi2, gain=gain,
+    # class_proportion=class_proportion,
+    # num_dimensions=num_dimensions,
     num_exemplars=num_epochs*batch_size,
+    **config,
+    **kwargs,
   )
   
   eval_dataset = dataset_cls(
     key=eval_dataset_key,
-    xi1=xi1, xi2=xi2, gain=gain,
-    class_proportion=class_proportion,
-    num_dimensions=num_dimensions,
+    # xi1=xi1, xi2=xi2, gain=gain,
+    # class_proportion=class_proportion,
+    # num_dimensions=num_dimensions,
     num_exemplars=1000,#max(20*batch_size,1000),
+    **config,
+    **kwargs,
   )
   
   # import ipdb; ipdb.set_trace()
@@ -386,12 +432,15 @@ def simulate(
   #########
   # Model setup.
   model = model_cls(
-      in_features=num_dimensions,
+      in_features=num_dimensions ** dim,
       hidden_features=num_hiddens,
+      out_features=out_features,
       act=activation,
       key=model_key,
       init_scale=init_scale,
       use_bias=use_bias,
+      bias_value=bias_value,
+      bias_trainable=bias_trainable,
       init_fn=init_fn,
   )
   print(f"Model:\n{model}\n")
@@ -417,6 +466,7 @@ def simulate(
       model=eqx.tree_inference(model, True),
       key=eval_key,
       batch_size=len(eval_sampler),
+      loss_fn=loss_fn,
     )
   log_to_wandb(metrics_) if wandb_ else metrics.append(metrics_)
 
@@ -436,7 +486,7 @@ def simulate(
     (train_key,) = jax.random.split(train_key, 1)
     train_step_num = int(next(itercount))
     train_loss, model, opt_state = train_step(
-      model, optimizer, opt_state, x, y, train_key
+      model, optimizer, opt_state, x, y, train_key, loss_fn
     )
 
     if train_step_num % evaluation_interval == 0:
@@ -450,6 +500,7 @@ def simulate(
         model=eqx.tree_inference(model, True),
         key=eval_key,
         batch_size=len(eval_sampler),
+        loss_fn=loss_fn,
       )
       
       log_to_wandb(metrics_) if wandb_ else metrics.append(metrics_)
@@ -472,25 +523,32 @@ def simulate(
   metrics['epoch'] = np.minimum(metrics.index * evaluation_interval, num_epochs)
   metrics = metrics.to_numpy()[:,:-1]
   if save_:
-    weightwd = '../localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/weights'
+    weightwd = '/Users/leonlufkin/Documents/GitHub/Localization/localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/weights'
     np.savez(f"{weightwd}/{path_key}.npz", weights=weights, metrics=metrics)
+    print("Saved " + path_key + ".npz")
 
   return weights, metrics
 
 def load(**kwargs):
   path_key = make_key(**kwargs)
-  weightwd = '../localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/weights'
+  weightwd = '/Users/leonlufkin/Documents/GitHub/Localization/localization/results/weights' if gethostname() == 'Leons-MBP' else '/ceph/scratch/leonl/results/weights'
   if path_key + '.npz' in os.listdir(weightwd):
     print('Already simulated')
     data = np.load(weightwd + '/' + path_key + '.npz', allow_pickle=True)
     return data['weights'], data['metrics']
+  # print('File ' + path_key + '.npz' + ' not found')
+  # try removing the seed, accounts for change in make_key implemented on 12-04-2023 that adds seed to path_key
+  if 'seed' in kwargs.keys():
+    kwargs.pop('seed')
+    return load(**kwargs)
   
-  raise ValueError('No such file')
+  raise ValueError('File ' + path_key + '.npz' + ' not found')
 
 def simulate_or_load(**kwargs):
   try:
     weights_, metrics_ = load(**kwargs)
-  except:
+  except ValueError as e:
+    print(e)
     print('Simulating')
     weights_, metrics_ = simulate(**kwargs)
   return weights_, metrics_
@@ -498,34 +556,86 @@ def simulate_or_load(**kwargs):
 if __name__ == '__main__':
 
   # define config
-  config = dict(
+  config1 = dict(
     seed=0,
-    num_dimensions=40,
-    num_hiddens=40,
-    gain=0.01,#3,
-    init_scale=1.0,
+    num_dimensions=30, dim=2,
+    # num_hiddens=60,
+    num_hiddens=20,#10,
+    # gain=100,
+    gain=100,
+    init_scale=0.01,
     activation='relu',
+    # activation='sigmoid',
     model_cls=models.SimpleNet,
-    use_bias=False,
-    optimizer_fn=optax.sgd,
-    learning_rate=0.5,#10.0,
-    batch_size=1000,#1000,
-    num_epochs=1000,#500,
-    # dataset_cls=datasets.SinglePulseDataset,
-    # xi1=(0.2, 0.25), # (20, 25),
-    # xi2=(0.05, 0.1), #(5, 10), # (5, 10),
+    # model_cls=models.MLP,
+    use_bias=False,# bias_value=-1.0, bias_trainable=False,
+    optimizer_fn=optax.sgd, learning_rate=20*0.15, #10*0.15,#40*0.15,#10*1.,#3.0,
+    # optimizer_fn=optax.adam, learning_rate=0.1,
+    batch_size=10000,
+    num_epochs=10000,
+    # dataset_cls=datasets.NortaDataset,
+    # marginal_qdf=datasets.LaplaceQDF(),
+    # marginal_qdf=datasets.GaussianQDF(),
+    # marginal_qdf=datasets.UniformQDF(),
+    # marginal_qdf=datasets.BernoulliQDF(),
+    # marginal_qdf=datasets.AlgQDF(4),
     dataset_cls=datasets.NonlinearGPDataset,
-    xi1=2,
-    xi2=1,
-    support=(-1.0, 1.0),
+    # xi=(1, 3,),
+    xi=(1, 2),
+    # xi=(0.1, 5),
+    # xi=(0.5, 0.4,),
+    # xi=(5, 4, 0.3, 0.2, 0.1,),
+    num_steps=2500,
+    adjust=(-1.0, 1.0),
     class_proportion=0.5,
     sampler_cls=samplers.EpochSampler,
     init_fn=models.xavier_normal_init,
+    loss_fn='mse',
     save_=True,
+    evaluation_interval=100,
+  )
+  
+  # define config
+  config2 = dict(
+    seed=0,
+    num_dimensions=100,
+    # num_hiddens=60,
+    num_hiddens=10,#10,
+    # gain=100,
+    gain=100,
+    init_scale=0.001,
+    activation='relu',
+    # activation='sigmoid',
+    model_cls=models.SimpleNet,
+    # model_cls=models.MLP,
+    use_bias=False,# bias_value=-1.0, bias_trainable=False,
+    optimizer_fn=optax.sgd, learning_rate=10*0.15, #10*0.15,#40*0.15,#10*1.,#3.0,
+    # optimizer_fn=optax.adam, learning_rate=0.1,
+    batch_size=5000,
+    num_epochs=1000,
+    dataset_cls=datasets.NortaDataset,
+    # marginal_qdf=datasets.LaplaceQDF(),
+    # marginal_qdf=datasets.GaussianQDF(),
+    # marginal_qdf=datasets.UniformQDF(),
+    # marginal_qdf=datasets.BernoulliQDF(),
+    marginal_qdf=datasets.AlgQDF(4),
+    # dataset_cls=datasets.NonlinearGPDataset,
+    # xi=(1, 3,),
+    xi=(0.1, 5),
+    # xi=(0.5, 0.4,),
+    # xi=(5, 4, 0.3, 0.2, 0.1,),
+    num_steps=2500,
+    adjust=(-1.0, 1.0),
+    class_proportion=0.5,
+    sampler_cls=samplers.EpochSampler,
+    init_fn=models.xavier_normal_init,
+    loss_fn='mse',
+    save_=True,
+    evaluation_interval=100,
   )
   
   # log config to wandb
   wandb_ = False
 
   # run it
-  simulate(wandb_=wandb_, **config)
+  simulate(wandb_=wandb_, **config1)

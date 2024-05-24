@@ -1,0 +1,186 @@
+The starting point for our work is the two-layer feedforward neural network:
+\begin{align}
+    \hat{y}(x) &= \left( \sum_{i=1}^K w_i \sigma\left(\langle w_i, x \rangle + b_i \right) \right) + b, \label{eq:two_layer_network}
+\end{align}
+for some nonlinearity $\sigma : \R \to \R$.
+For the sake of analysis, we simplify the network to be a soft-committee machine:
+\begin{align}
+    \hat{y}(x) &= \frac{1}{K} \sum_{i=1}^K \sigma\left(\langle w_i, x \rangle + b_i \right). \label{eq:soft_committee_machine}
+\end{align}
+We will ignore details about weight initialization for now, but we typically initialize the weights $w_i$ to be i.i.d.\ from a Gaussian distribution with mean zero.
+
+Let us consider data $(X, Y)$ from a distribution $p$ on $\R^n \times \R$ satisfying the following assumptions:
+\begin{enumerate}
+    \item \emph{Symmetry about 0}: $p(x) = p(-x)$ for all $x \in \R^n$.
+    \item \emph{Translation invariance}: $p(x) = p(S^i x)$ for all $x \in \R^n$ and $i \in \{1, \ldots, n\}$, where $S$ is the shift operator.
+    \item \emph{Localized covariance}: $\Sigma(i,j) = 0$ if $|i-j| > k$ for some $k$.
+\end{enumerate}
+
+\subsection{Theoretical Results}
+We consider a single ReLU neuron for simplicity.
+The gradient flow is
+\begin{align}
+    \tau \frac{d}{dt} w &= \frac{1}{2} \underbrace{\E_{X \mid Y=1} \left[ \mathbbm{1}(\langle w, X \rangle \geq 0) X \right]}_{\triangleq f(w)} - \left( \Sigma_0 + \Sigma_1 \right) w.
+\end{align}
+We analyze $f$ entrywise:
+\begin{align}
+    f_i(w) 
+    &= \E_{X \mid Y=1} \left[ \mathbbm{1}(\langle w, X \rangle \geq 0) X_i \right] \\
+    &= \E_{X_i \mid Y=1} \left[ \mathbbm{P}_{X \mid X_i, Y=1}(\langle w, X \rangle \geq 0) X_i \right] \\
+    &= \E_{X_i \mid Y=1} \left[ \left( \Phi\left( \frac{\langle w, \mu_{\mid X_i} \rangle}{\sqrt{ w^\top \Sigma_{\mid X_i} w}} \right) - \frac{1}{2} \right) X_i \right] + \eps(w) \\
+    &= \E_{X_i \mid Y=1} \left[ \operatorname{erf}\left( \frac{1}{\sqrt{2}} \cdot \frac{\langle w, \mu_{\mid X_i} \rangle}{\sqrt{ w^\top \Sigma_{\mid X_i} w}} \right) X_i \right] + \eps(w),
+\end{align}
+where $\eps(w)$ is the error term, acquired by assuming $X \mid X_i, Y=1$ is Gaussian.
+
+Marginal concentration is not necessary (though it seems to be sufficient!), as I can construct counterexamples.
+% What's really important is how $\frac{\langle w, \mu_{\mid X_i} \rangle}{\sqrt{ w^\top \Sigma_{\mid X_i} w}}$ behaves as a function of $X_i$.
+% When $X$ is Gaussian, where we don't see localization, it depends linearly on $X_i$.
+% When $X$ is high-gain, it is linear and constant w.r.t. $X_i$ (because of marginal concentration).
+% In the intermediate-gain case, where we see localization, it depends superlinearly on $X_i$.
+% I can construct examples where it is the sign function, and we still get localization.
+
+Assuming just $\mu_{\mid X_i} \propto X_i$ (which I would consider a very reasonable assumption), we can conclude that $\mu_{\mid X_i} = \sigma_i X_i$, where $\sigma_i$ is the $i$-th row in our covariance matrix $\Sigma$ for the corresponding class (either $Y=0$ or $Y=1$).
+It is harder to make statements about $\Sigma_{\mid X_i}$.
+However, let us momentarily assume it has the form $\Sigma_{\mid X_i} = \Sigma - \sigma_i \sigma_i^\top$, which holds in both the Gaussian and high-gain cases (though not exactly for intermediate-gain, though this is not really an issue).
+Then, we can write 
+\begin{align}
+    f_i(w) 
+    &= \E_{X_i \mid Y=1} \left[ \operatorname{erf}\left( \frac{X_i}{\sqrt{2}} \operatorname{alg}^{-1} \left( \frac{\langle w, \sigma_i \rangle}{\sqrt{w^\top \Sigma w}} \right) \right) X_i \right] + \eps(w),
+\end{align}
+where $\operatorname{alg} : \R \to (-1, 1)$ is the algebraic sigmoid function, defined by $\operatorname{alg}(x) = \frac{x}{\sqrt{1+x^2}}$.
+Defining $\varphi(a) = \E_{X_i \mid Y=1} [ \operatorname{erf}( X_i / \sqrt{2} \operatorname{alg}^{-1} ( a ) ) X_i ]$, we can simply write
+\begin{align}
+    f_i(w) 
+    &= \varphi \left( \frac{\langle w, \sigma_i \rangle}{\sqrt{w^\top \Sigma w}} \right) + \eps(w).
+\end{align}
+Note that $\varphi(a) = \sqrt{\frac{2}{\pi}} a$ when $X$ is Gaussian.
+In fact, for small $a$, we can always write $\varphi(a) \approx \sqrt{\frac{2}{\pi}} a$ (assuming unit marginal variance).
+If $X_i$ is bimodal, then $\varphi(a) > \sqrt{\frac{2}{\pi}} a$ for larger $a$.
+The opposite seems to be true if it has smaller tails than the Gaussian.
+This is based on testing a bunch of examples, though this makes intuitive sense as well.
+\emph{I will think about how to formalize this intuition.}
+
+Using the above notation, it is natural to consider the large $n$ limit and make our system of coupled ODEs a PDE.
+Treating $w$ as a function of position $x$ and time $t$, and ignoring $\eps$, we can write
+\begin{align*}
+    \tau \frac{\partial}{\partial t} w(x, t) &= \frac{1}{2} \varphi\left( \frac{ \Sigma_1 \star w }{ \langle \Sigma_1 \star w, w \rangle } \right) - \left( \Sigma_0 + \Sigma_1 \right) \star w,
+\end{align*}
+where the convolutions are performed over the spatial domain.
+We can recover the same general results from this PDE: when $\varphi(a) \propto a$, i.e. the Gaussian setting, we have an oscillatory steady state, while when $\varphi(a)$ is superlinear, we have a localized steady state, though the latter I can only show empirically.
+This PDE almost certainly does not have an explicit solution.
+However, it may be possible to show that the steady state is sparse when $\varphi(a)$ is superlinear.
+I have been thinking about this for a while, but I have not made much progress.
+\emph{I am continuing to think about it.}
+
+\subsubsection{Removing the normal approximation}
+Let us return to our definition of $f_i(w)$.
+To get an explicit form of the expectation, we previously assumed $X \mid X_i$ is Gaussian.
+Now, let us try to dispense with this assumption by using tools like Chebyshev's inequality instead.
+
+We focus on the term $\PR_{X \mid X_i, Y=1}( \langle w, X \rangle \geq 0 )$.
+Let $\mu_i \triangleq \E_{X \mid X_i, Y=1}[ \langle w, X \rangle ]$ and $\sigma_i^2 \triangleq \V_{X \mid X_i, Y=1}[ \langle w, X \rangle ]$.
+Note that $\mu_i = \langle w, \mu_{\mid X_i} \rangle$ and $\sigma_i^2 = w^\top \Sigma_{\mid X_i} w$.
+By Chebyshev's inequality, we have for all positive $k$
+\begin{align*}
+    \PR_{X \mid X_i, Y=1}( | \langle w, X \rangle - \mu_i | \geq k \sigma_i ) \leq \frac{1}{k^2}
+    \iff
+    \PR_{X \mid X_i, Y=1}( | \langle w, X \rangle - \mu_i | > k \sigma_i ) \geq 1 - \frac{1}{k^2}.
+\end{align*}
+Note that $| \langle w, X \rangle - \mu_i | < k \sigma_i \implies -(\langle w, X \rangle - \mu_i) < k \sigma_i \iff \langle w, X \rangle > \mu_i - k \sigma_i$.
+This implies that
+\begin{align*}
+    \PR_{X \mid X_i, Y=1}( \langle w, X \rangle > \mu_i - k \sigma_i )
+    &\geq \PR_{X \mid X_i, Y=1}( | \langle w, X \rangle - \mu_i | > k \sigma_i )
+    \geq 1 - \frac{1}{k^2}.
+\end{align*}
+Let us assume that $\mu_i > 0$.
+Then, picking $k = \frac{\mu_i}{\sigma_i}$, we get
+\begin{align*}
+    \PR_{X \mid X_i, Y=1}( \langle w, X \rangle > 0 )
+    &\geq 1 - \frac{\sigma_i^2}{\mu_i^2} \\
+    &= 1 - \frac{w^\top \Sigma_{\mid X_i} w}{\langle w, \mu_{\mid X_i} \rangle^2}
+    = 1 - \frac{w^\top \Sigma_1 w - (\langle w, \sigma_i \rangle)^2}{X_i^2 \langle w, \sigma_i \rangle^2}
+    = 1 - \frac{1}{X_i^2} \left( \frac{w^\top \Sigma_1 w}{(\langle w, \sigma_i \rangle)^2} - 1 \right) \\
+    &= 1 - \frac{1}{X_i^2} \left( \frac{1}{a^2} - 1 \right),
+\end{align*}
+where $a = \frac{\langle w, \sigma_i \rangle}{\sqrt{w^\top \Sigma_1 w}}$.
+
+Recall that Chebyshev's bound is only useful when $k > 1$.
+That is, $$ \mu_i > \sigma_i \iff X_i \langle w, \sigma_i \rangle > \sqrt{w^\top \Sigma_1 w - (\langle w, \sigma_i \rangle)^2} \iff \frac{1}{\sqrt{1/a^2 - 1}} = \frac{ \langle w, \sigma_i \rangle }{ \sqrt{w^\top \Sigma_1 w - (\langle w, \sigma_i \rangle)^2} } > \frac{1}{X_i}. $$
+This can be further rewritten as $$ X_i > \sqrt{1/a^2 - 1} \iff X_i^2 + 1 > 1/a^2 \iff a = \frac{\langle w, \sigma_i \rangle}{\sqrt{w^\top \Sigma_1 w}} > \frac{1}{\sqrt{X_i^2 + 1}}. $$
+So, it's more likely to be useful for larger values of $X_i$, or where $a$ is large ($w$ looks localized).
+
+Let us use this to bound $f_i(w)$.
+\begin{align*}
+    f_i(w)
+    &= \E_{X_i \mid Y=1} \left[ \PR_{X \mid X_i, Y=1}( \langle w, X \rangle > 0 ) X_i \right] \\
+    &= \E_{X_i > 0 \mid Y=1} \left[ \PR_{X \mid X_i, Y=1}( \langle w, X \rangle > 0 ) X_i \right] + \E_{X_i < 0 \mid Y=1} \left[ \PR_{X \mid X_i, Y=1}( \langle w, X \rangle > 0 ) X_i \right] \\
+    &= \E_{X_i > 0 \mid Y=1} \left[ \PR_{X \mid X_i, Y=1}( \langle w, X \rangle > 0 ) X_i \right] - \E_{X_i > 0 \mid Y=1} \left[ \PR_{X \mid -X_i, Y=1}( \langle w, X \rangle > 0 ) X_i \right] \\
+    &= \E_{X_i > 0 \mid Y=1} \left[ \PR_{X \mid X_i, Y=1}( \langle w, X \rangle > 0 ) X_i \right] - \E_{X_i > 0 \mid Y=1} \left[ \PR_{X \mid X_i, Y=1}( -\langle w, X \rangle > 0 ) X_i \right] \\
+    &= \E_{X_i > 0 \mid Y=1} \left[ \left( \PR_{X \mid X_i, Y=1}( \langle w, X \rangle > 0 ) - \PR_{X \mid X_i, Y=1}( -\langle w, X \rangle > 0 ) \right) X_i \right] \\
+    &= \E_{X_i > 0 \mid Y=1} \left[ \left( 2 \PR_{X \mid X_i, Y=1}( \langle w, X \rangle > 0 ) - 1 \right) X_i \right] \\
+    &= 2 \E_{X_i > 0 \mid Y=1} \left[ \PR_{X \mid X_i, Y=1}( \langle w, X \rangle > 0 ) X_i \right] - \E_{X_i \mid Y=1} \left[ |X_i| \right].
+\end{align*}
+If $\langle w, \sigma_i \rangle \geq 0$, then $\langle w, \mu_{\mid X_i} \rangle \geq 0$ for $X_i > 0$.
+Thus, $\mu_i > 0$ and we can write
+\begin{align*}
+    f_i(w)
+    &\geq 2 \E_{X_i > 0 \mid Y=1} \left[ \left( 1 - \frac{1}{X_i^2} \left( \frac{1}{a^2} - 1 \right) \right) X_i \right] - \E_{X_i \mid Y=1} \left[ |X_i| \right] \\
+    &= \E_{X_i \mid Y=1} \left[ |X_i| \right] - 2 \left( \frac{1}{a^2} - 1 \right) \E_{X_i \mid Y=1} \left[ \frac{1}{|X_i|} \right] \\
+\end{align*}
+
+
+\subsection{Empirical Results}
+I was able to show during my internship that a model trained on elliptical data will not localize.
+I showed this theoretically for ReLU activation, and confirmed it empirically in \cref{fig:ellipse_rf}.
+(It looks jagged because of a numerical issue from how I construct samples from arbitrary elliptical distributions.
+Using a distribution with existing sampling algorithms, like the multivariate $t$, works better.)
+This was interesting because it seemed to run contrary to the standard argument that kurtosis drives localization (as mentioned in \cite{brito2016nonlinear} and \cite{ingrosso2022data}).
+However, it did not technically disprove any previous results, since those examples could be explained by the fact that the marginal distributions were concentrated.
+
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{elliptical_RF.png}
+    \caption{The RF of a model trained on elliptical data.}
+    \label{fig:ellipse_rf}
+\end{figure}
+
+Elliptical distributions are very flexible.
+The only constraint they impose is radial symmetry.
+This leads one to wonder whether violating radial symmetry may be sufficient for localization.
+
+In general, we can write a density $p(x)$ in terms of $p(r, \theta)$, where $\theta$ is an angle and $r$ is the norm of $x$ under some (possibly weighted) norm.
+Let us consider distributions that can be factorized as $p(r, \theta) = p(r) p(\theta)$.
+This contains elliptical distributions, since we assume that $p(\theta)$ is constant and $p(r)$ parameterizes an elliptical, which is easy to see if we define $r = \sqrt{x^\top \Sigma^{-1} x}$ (a weighted norm).
+
+Let's consider a setting where $p(\theta)$ disfavors some angles around $\theta_0$ by having $p(\theta) = 0$ for $\theta \in (\theta_0-\eps,\theta_0+\eps)$.
+% What if we tweak $p(\theta)$ to disfavor some point over others?
+% (I need to clarify exactly what this means.)
+Recall that we need to make it satisfy sign- and translation-invariance.
+So, we get that it disfavors $2n$ neighborhoods spaced evenly along both sides of the $n$ axis lines, up to some rotation.
+Because we have factorized the density as $p(r) p(\theta)$, this immediately implies the distribution has concentrated marginals, up to some rotation.
+This means that, in rotated space, $w$ will be localized.
+
+This is not rigorous, and I have not thoroughly tested this, but I have run some experiments to suggest this may be true.
+Below, I show the RF for a model trained on an elliptical distribution where I threw out points that were aligned along an axis.
+[\emph{I'm still working on fixing this figure, since the numerical error seems to become more of a problem here. But I was able to get the RF from \cref{fig:ellipse_rf} to localize by just throwing out some samples like how I mentioned above.}]
+
+Of course, this is only one way to break radial symmetry, but it does suggest that we are somewhat close to having a sharp distinction between distributions that will localize and those that won't.
+
+% The key questions:
+% \begin{enumerate}
+%     \item Can this approach help us identify a crisp distinction between which distributions will yield localization and which won't? (That is, can we establish clear positive and negative results?)
+%     \item Could we even test those predictions? (We need to do this because we make an approximation we don't really understand in the analysis.)
+% \end{enumerate}
+
+% Can we usually write
+% \begin{align*}
+%     \frac{\langle w, \mu_{\mid X_i} \rangle}{\sqrt{ w^\top \Sigma_{\mid X_i} w}} &= \frac{\langle w, \sigma \rangle}{\sqrt{ w^\top (\Sigma - \sigma \sigma^\top) w}} f(X_i),
+% \end{align*}
+% for some $f$?
+
+% What does it mean for $\Sigma_{\mid X_i}$ to depend on the value of $X_i$, as opposed to just the fact that we are conditioning on position $i$?
+
+
+
+

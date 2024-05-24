@@ -11,97 +11,9 @@ import equinox.nn as enn
 
 from jax import Array
 from collections.abc import Callable
+import ipdb
 
-
-def trunc_normal_init(
-  weight: Array, key: Array, stddev: float | None = None
-) -> Array:
-  """Truncated normal distribution initialization."""
-  _, in_ = weight.shape
-  stddev = stddev or sqrt(1.0 / max(1.0, in_))
-  return stddev * jax.random.truncated_normal(
-    key=key,
-    shape=weight.shape,
-    lower=-2,
-    upper=2,
-  )
-
-
-# Adapted from https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/initializers.py.
-def lecun_normal_init(
-  weight: Array,
-  key: Array,
-  scale: float = 1.0,
-) -> Array:
-  """LeCun (variance-scaling) normal distribution initialization."""
-  _, in_ = weight.shape
-  scale /= max(1.0, in_)
-
-  stddev = np.sqrt(scale)
-  # Adjust stddev for truncation.
-  # Constant from scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
-  distribution_stddev = jnp.asarray(0.87962566103423978, dtype=float)
-  stddev = stddev / distribution_stddev
-
-  return trunc_normal_init(weight, key, stddev=stddev)
-
-def xavier_normal_init(
-  weight: Array,
-  key: Array,
-  scale: float = 1.0,
-):
-  xavier = jax.nn.initializers.glorot_normal()
-  stddev = np.sqrt(scale)
-  return stddev * xavier(key, weight.shape)
-
-def torch_init(
-  weight: Array,
-  key: Array,
-  scale: float = 1.0,
-):
-  K, L = weight.shape
-  assert K == 100 and L == 40
-  torch_init = jnp.load('weights/torch_weights.npz', allow_pickle=True)
-  weight, bias = torch_init['weight'], torch_init['bias']
-  print("Loaded torch weights.")
-  return weight
-
-def pretrained_init(
-  weight: Array,
-  key: Array,
-  scale: float = 1.0,
-):
-  K, L = weight.shape
-  weight = jnp.load(f'weights/pretrained_weights_L={L}_K={K}.npy')
-  print("Loaded pretrained weights for L={L}, K={K}.")
-  return jnp.sqrt(scale) * weight
-
-def pruned_init(
-  weight: Array,
-  key: Array,
-  scale: float = 1.0,
-):
-  K, L = weight.shape
-  weight = jnp.load(f'weights/pruned_weights_L={L}_K={K}.npy')
-  print("Loaded pruned weights for L={L}, K={K}.")
-  return jnp.sqrt(scale) * weight
-
-def small_bump_init(
-  weight: Array,
-  key: Array,
-  scale: float = 1.0,
-):
-  K, L = weight.shape
-  assert K == 2 and L == 40
-  scale = jnp.sqrt(scale)
-  weight = jnp.zeros((K, L))
-  weight = weight.at[0, 2].set(1. * scale)
-  weight = weight.at[0, 3].set(2. * scale)
-  weight = weight.at[0, 4].set(1. * scale)
-  weight = weight.at[1, 2].set(-1. * scale)
-  weight = weight.at[1, 3].set(-2. * scale)
-  weight = weight.at[1, 4].set(-1. * scale)
-  return weight
+from localization.models.initializers import trunc_normal_init, lecun_normal_init, xavier_normal_init, torch_init, pretrained_init, pruned_init, small_bump_init
 
 class StopGradient(eqx.Module):
   """Stop gradient wrapper."""
@@ -121,11 +33,14 @@ class Linear(enn.Linear):
     in_features: int,
     out_features: int,
     use_bias: bool = True,
-    trainable: bool = True,
+    weight_trainable: bool = True,
+    bias_value: float = 0.0,
+    bias_trainable: bool = False,
     *,
     key: Array,
     init_scale: float = 1.0,
     init_fn: Callable = xavier_normal_init,
+    init_shift: float = 0.0,
   ):
     """Initialize a linear layer."""
     super().__init__(
@@ -136,15 +51,15 @@ class Linear(enn.Linear):
     )
 
     # Reinitialize weight from variance scaling distribution, reusing `key`.
-    self.weight: Array = init_fn(self.weight, key=key, scale=init_scale) # xavier_normal_init
-    if not trainable:
+    self.weight: Array = init_fn(self.weight, key=key, scale=init_scale) + init_shift # xavier_normal_init
+    if not weight_trainable:
       self.weight = StopGradient(self.weight)
 
     # Reinitialize bias to zeros.
     if use_bias:
-      self.bias: Array = jnp.zeros_like(self.bias)
+      self.bias: Array = bias_value * jnp.ones_like(self.bias)
 
-      if not trainable:
+      if not bias_trainable:
         self.bias = StopGradient(self.bias)
 
 
@@ -154,7 +69,8 @@ class MLP(eqx.Module):
   fc1: eqx.Module
   act: Callable
   fc2: eqx.Module
-  tanh: Callable
+  num_hiddens: int
+  # tanh: Callable
 
   def __init__(
     self,
@@ -197,17 +113,33 @@ class MLP(eqx.Module):
       out_features=out_features,
       key=keys[1],
       init_scale=init_scale,
+      init_shift=1.,
       **linear_kwargs,
     )
-    self.tanh = jax.nn.tanh
+    self.num_hiddens = hidden_features
+    # ipdb.set_trace()
+    # self.tanh = jax.nn.tanh
 
   def __call__(self, x: Array, *, key: Array) -> Array:
-    """Apply the MLP block to the input."""
-    x = self.fc1(x)
-    x = self.act(x)
+    """
+    Apply the MLP block to the input.
+    Unlike previous MLP, return hidden layer as well (for sparse autoencoder).
+    """
+    preact = self.fc1(x)
+    x = self.act(preact)
+    x = self.fc2(x) / self.num_hiddens
+    return x#, preact
+
+class MLP_hidden(MLP):
+  def __call__(self, x: Array, *, key: Array) -> Array:
+    """
+    Apply the MLP block to the input.
+    Unlike previous MLP, return hidden layer as well (for sparse autoencoder).
+    """
+    preact = self.fc1(x)
+    x = self.act(preact)
     x = self.fc2(x)
-    x = self.tanh(x)
-    return x
+    return x, preact
 
 class SimpleNet(eqx.Module):
   """
@@ -226,6 +158,7 @@ class SimpleNet(eqx.Module):
     *,
     key: Array = None,
     init_scale: float = 1.0,
+    out_features: int | None = 1,
     **linear_kwargs
   ):
     """Initialize an MLP.
