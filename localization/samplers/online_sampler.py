@@ -33,7 +33,7 @@ class OnlineSampler(SingletonSampler):
 
   def __getitem__(self, index: int | slice) -> ExemplarType:
     """Return exemplar-class pairs at index `index` of `Sampler`."""
-    # TODO(eringrant): Simplify this while maintaining type-validity.
+    # TODO: Simplify this while maintaining type-validity.
     if isinstance(index, slice):
       transformed_index = slice_to_array(index, len(self))
     else:
@@ -43,7 +43,7 @@ class OnlineSampler(SingletonSampler):
     if not isinstance(epoch_idx, int):
       unique_vals = jnp.unique(epoch_idx)
       if unique_vals.size != 1:
-        # TODO(eringrant): Implement this case.
+        # TODO: Implement this case.
         raise ValueError("Array should contain only one unique value.")
       epoch_idx = unique_vals[0]
     index_in_epoch = transformed_index % self.dataset_size

@@ -31,7 +31,7 @@ class OtherSampler(SingletonSampler):
 
   def __getitem__(self, index: int | slice) -> ExemplarType:
     """Return exemplar-class pairs at index `index` of `Sampler`."""
-    # TODO(eringrant): Simplify this while maintaining type-validity.
+    # TODO: Simplify this while maintaining type-validity.
     if isinstance(index, slice):
       transformed_index = slice_to_array(index, len(self))
     else:
