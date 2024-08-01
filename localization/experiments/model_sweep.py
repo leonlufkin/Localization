@@ -54,7 +54,7 @@ if __name__ == '__main__':
         xi=(0.3, 0.7),
         # dataset_cls=datasets.NonlinearGPDataset,
         batch_size=50000,
-        support=(-1, 1), # defunct
+        adjust=(-1.0, 1.0), # not really used
         class_proportion=0.5,
         # model config
         model_cls=models.SimpleNet,
