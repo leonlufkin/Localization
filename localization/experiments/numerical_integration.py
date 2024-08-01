@@ -87,7 +87,7 @@ if __name__ == '__main__':
         use_bias=False,
         optimizer_fn=optax.sgd,
         learning_rate=0.01,
-        batch_size=1000,#10000,
+        batch_size=50000,#10000,
         num_epochs=10000,
         dataset_cls=datasets.NonlinearGPDataset,
         xi=(0.3, 0.7), #(0.7, 0.3,),
