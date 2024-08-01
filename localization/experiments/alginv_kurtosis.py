@@ -29,7 +29,7 @@ from localization import datasets
 from localization import samplers
 from localization import models
 from localization.utils import make_key
-from localization.experiments import supervise
+from localization.experiments import supervise, simulate_or_load
 
 import ipdb
 
@@ -70,5 +70,6 @@ if __name__ == '__main__':
   print(len(list(itertools.product(ks, hiddens))))
   for (k, hidden) in tqdm(itertools.product(ks, hiddens)):
     config.update(dict(marginal_qdf=datasets.AlgQDF(k=k), num_hiddens=hidden))
-    supervise(wandb_=False, **config)
+    # supervise(wandb_=False, **config)
+    simulate_or_load(wandb_=False, supervise=True, **config)
 

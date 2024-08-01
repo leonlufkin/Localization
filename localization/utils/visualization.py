@@ -37,6 +37,8 @@ def plot_receptive_fields(weights: list, num_cols=None, evaluation_interval=500,
     return fig, axs
 
 def plot_rf_evolution(weights, num_rows=1, num_cols=1, figsize=(15, 5), cmap='gray'):
+    if weights.ndim == 2: # means we're just looking at a single neuron
+        weights = weights[:,np.newaxis]
     # num_rows * num_cols is the number of receptive fields to plot
     fig, axs = plt.subplots(num_rows, num_cols, figsize=figsize, sharex=True, sharey=True)
     cmap_ = plt.get_cmap(cmap)

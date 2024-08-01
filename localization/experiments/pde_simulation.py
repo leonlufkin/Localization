@@ -36,8 +36,8 @@ def integrate(w_init, cov1, cov0, lr, num_epochs, cov1_weight=0.5, cov0_weight=0
   sw0_ = np.zeros((num_epochs, n))
   f_ = np.zeros((num_epochs, n))
   
-#   C = jnp.abs(jnp.tile(jnp.arange(n)[:, jnp.newaxis], (1, n)) - jnp.tile(jnp.arange(n), (n, 1)))
-#   C = jnp.minimum(C, n - C)
+  # C = jnp.abs(jnp.tile(jnp.arange(n)[:, jnp.newaxis], (1, n)) - jnp.tile(jnp.arange(n), (n, 1)))
+  # C = jnp.minimum(C, n - C)
   C = jnp.arange(n)
   C = jnp.minimum(C, n - C)
   sigma1 = cov1(C / n)

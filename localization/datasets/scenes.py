@@ -28,6 +28,7 @@ class ScenesDataset(Dataset):
     key: Array,
     side_length: int = 12,
     num_exemplars: int = 1000,
+    subsample: int = 1,
     **kwargs
   ):
     """Initializes a `ScenesDataset` instance."""
@@ -40,24 +41,44 @@ class ScenesDataset(Dataset):
     self.side_length = side_length
     
     # Load images
-    self.scenes = scipy.io.loadmat('/Users/leonlufkin/Documents/GitHub/Localization/localization/datasets/IMAGES.mat')['IMAGES']
-    self.scenes = jnp.rollaxis(self.scenes, -1)
+    # self.scenes = scipy.io.loadmat('/Users/leonlufkin/Documents/GitHub/Localization/localization/datasets/IMAGES.mat')['IMAGES']
+    # self.scenes = jnp.rollaxis(self.scenes, -1)
+    self.scenes = jnp.load('/Users/leonlufkin/Documents/GitHub/Localization/localization/datasets/BIPED.npy')
     
     # Sampling functions
     self.randint = jax.vmap(jax.random.randint, in_axes=(0, None, None, None))
     
-    def get_patch(key, dataset, patch_size):
-      # ipdb.set_trace()
+    # Sampling function for data from Olshausen & Field (1997)
+    def get_of_patch(key, dataset, patch_size, subsample=1):
+      patch_pre_size = patch_size * subsample
       img_key, pos_key = jax.random.split(key, 2)
       img_idx = jax.random.randint(img_key, (), 0, 10)
-      x0, y0 = jax.random.randint(pos_key, (2,), 0, 512 - self.side_length)
-      patch = jax.lax.dynamic_slice(dataset[img_idx], (x0, y0), (patch_size, patch_size))
+      x0, y0 = jax.random.randint(pos_key, (2,), 0, 512 - patch_pre_size)
+      pre_patch = jax.lax.dynamic_slice(dataset[img_idx], (x0, y0), (patch_pre_size, patch_pre_size))
+      # average and pool
+      window_dim = window_stride = (subsample, subsample)
+      patch = jax.lax.reduce_window(pre_patch, 0.0, jax.lax.add, window_dim, window_stride, 'VALID') # no padding
+      patch = patch / (subsample ** 2)
+      return jnp.ravel(patch)
+    
+    # Sampling function for data from BIPED
+    def get_biped_patch(key, dataset, patch_size, subsample=1):
+      patch_pre_size = patch_size * subsample
+      img_key, pos_key = jax.random.split(key, 2)
+      img_idx = jax.random.randint(img_key, (), 0, 250)
+      x0 = jax.random.randint(pos_key, (), 0, 720 - patch_pre_size)
+      y0 = jax.random.randint(pos_key, (), 0, 1280 - patch_pre_size)
+      pre_patch = jax.lax.dynamic_slice(dataset[img_idx], (x0, y0), (patch_pre_size, patch_pre_size))
+      # average and pool
+      window_dim = window_stride = (subsample, subsample)
+      patch = jax.lax.reduce_window(pre_patch, 0.0, jax.lax.add, window_dim, window_stride, 'VALID') # no padding
+      patch = patch / (subsample ** 2)
       return jnp.ravel(patch)
     
     self.get_patch = jax.jit(
       jax.vmap(
-        partial(get_patch,
-                  dataset=self.scenes, patch_size=self.side_length
+        partial(get_biped_patch,
+                  dataset=self.scenes, patch_size=self.side_length, subsample=subsample
                 ),
       ),# static_argnames=['patch_size']
     )
@@ -96,16 +117,18 @@ class ScenesDataset(Dataset):
     return patches, None
 
 
-if __name__ =="__main__":
+if __name__ == "__main__":
     key = jax.random.PRNGKey(0)
     side_length = 16
-    print("side_length: ", side_length)
-    dataset = ScenesDataset(key=key, side_length=side_length)
-    x, y = dataset[:10000]
+    sumsample = 3 # 20
+    print(f"side_length: {side_length}, sumsample: {sumsample}")
+    dataset = ScenesDataset(key=key, side_length=side_length, subsample=sumsample)
+    x, y = dataset[:1000]
+    # ipdb.set_trace()
     xx = (x.T @ x) / len(x)
     
     import matplotlib.pyplot as plt
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(20, 5))
     im = ax1.imshow(xx, cmap='gray')
     cbar = plt.colorbar(im)
     ax2.plot(x[0])
@@ -113,7 +136,8 @@ if __name__ =="__main__":
     ax3.axvline((side_length**2)//2, color='r', linestyle='--') 
     ax3.axvline((side_length**2)//2 - side_length, color='r', linestyle='--', linewidth=0.5)
     ax3.axvline((side_length**2)//2 + side_length, color='r', linestyle='--', linewidth=0.5)
-    fig.savefig(f'../datasets/scenes/covariance_{side_length}.png')
+    ax4.imshow(x[0].reshape(side_length, side_length), cmap='gray')
+    fig.savefig(f'../datasets/scenes/biped/covariance_{side_length}_{sumsample}.png')
     plt.close()
     
     # Print mean, variance, kurtosis
