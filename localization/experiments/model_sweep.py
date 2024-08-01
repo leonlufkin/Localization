@@ -12,7 +12,7 @@ if __name__ == '__main__':
     from localization.utils.launcher import get_executor, tupify
     from localization.utils.submit import submit_jobs, product_kwargs
 
-    executor = get_executor(
+    cpu_executor = get_executor(
         job_name="model_sweep_rebuttal",
         cluster="slurm",
         partition="cpu",
@@ -22,29 +22,16 @@ if __name__ == '__main__':
         gpus_per_node=0,
     )
     
-    # get_submitit_executor(
-    #     timeout_min=60,
-    #     mem_gb=10,
-    #     # export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl"
-    #     # NOTE: `log_dir` should be set to a directory shared across the head
-    #     # (launching) node as well as compute nodes;
-    #     # can set `export RESULTS_HOME="..." external to Python or
-    #     # change the below.
-    #     log_dir=Path(
-    #         os.path.join(os.environ.get("LOGS_HOME"), "gain_sweep")
-    #         if os.environ.get("LOGS_HOME") is not None
-    #         else os.path.join("/tmp", os.environ.get("USER"), "gain_sweep"),
-    #         get_timestamp(),
-    #     ),
-    #     # NOTE: Use `cluster="debug"` to simulate a SLURM launch locally.
-    #     cluster="slurm",
-    #     # NOTE: This may be specific to your cluster configuration.
-    #     # Run `sinfo -s` to get partition information.
-    #     slurm_partition="cpu",
-    #     slurm_parallelism=200,
-    #     gpus_per_node=0
-    # )
-
+    gpu_executor = get_executor(
+        job_name="model_sweep_rebuttal",
+        cluster="slurm",
+        partition="gpu",
+        timeout_min=180,
+        mem_gb=10,
+        parallelism=20,
+        gpus_per_node=1,
+    )
+    
     ## Define base config
     config = dict(
         # data config
@@ -64,8 +51,8 @@ if __name__ == '__main__':
         num_hiddens=1,
         activation='relu',
         use_bias=False,
-        learning_rate=0.01,
-        num_epochs=10000,
+        learning_rate=0.1,
+        num_epochs=1000,
         # learning config
         evaluation_interval=100,
         optimizer_fn=optax.sgd,
@@ -92,7 +79,7 @@ if __name__ == '__main__':
 
     ## Submit jobs
     jobs = submit_jobs(
-        executor=executor,
+        executor=cpu_executor,
         func=filter,
         kwargs_array=product_kwargs(
             **tupify(config),
