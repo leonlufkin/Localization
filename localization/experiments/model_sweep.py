@@ -15,11 +15,11 @@ if __name__ == '__main__':
     executor = get_executor(
         job_name="model_sweep_rebuttal",
         cluster="slurm",
-        partition="gpu",
-        timeout_min=120,
+        partition="cpu",
+        timeout_min=1200,
         mem_gb=10,
-        parallelism=30,
-        gpus_per_node=1,
+        parallelism=100,
+        gpus_per_node=0,
     )
     
     # get_submitit_executor(
