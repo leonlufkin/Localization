@@ -60,6 +60,14 @@ def integrate(
         
     return w
 
+def mse_aligned(w1, w2):
+    """
+    Accounting for possible slight differences in centering of receptive fields.
+    There are two ways to do this:
+    1. 
+    """
+    return jnp.square(w1 - w2).mean()
+
 if __name__ == '__main__':
     
     from localization.utils import build_gaussian_covariance, build_non_gaussian_covariance, plot_rf_evolution, plot_receptive_fields
@@ -69,31 +77,31 @@ if __name__ == '__main__':
     
     c = dict(
         seed=0, # 0
-        num_dimensions=40, # 100
+        num_dimensions=100, # 100
         num_hiddens=1,
         dim=1,
-        gain=100,
+        gain=0.01,#100,#0.01,
         init_scale=0.001,
         activation='relu',
         model_cls=models.SimpleNet,
         use_bias=False,
         optimizer_fn=optax.sgd,
-        learning_rate=0.1,
-        batch_size=250000,#10000,
-        num_epochs=1000,
+        learning_rate=0.01,
+        batch_size=1000,#10000,
+        num_epochs=10000,
         dataset_cls=datasets.NonlinearGPDataset,
-        xi=(0.7, 0.3,),
-        num_steps=1000,
+        xi=(0.3, 0.7), #(0.7, 0.3,),
+        # num_steps=10000,
         adjust=(-1.0, 1.0),
         class_proportion=0.5,
         sampler_cls=samplers.EpochSampler,
         init_fn=models.xavier_normal_init,
         loss_fn='mse',
         save_=True,
-        evaluation_interval=10,
+        evaluation_interval=100,
     )
     w_model = simulate_or_load(**c)[0][:,0]
-    mini_key = f'seed={c["seed"]}_L={c["num_dimensions"]}_g={c["gain"]}_is={c["init_scale"]}_lr={c["learning_rate"]}_b={c["batch_size"]}_xi={c["xi"][0]},{c["xi"][1]}_T={c["num_steps"]}'
+    mini_key = f'seed={c["seed"]}_L={c["num_dimensions"]}_g={c["gain"]}_is={c["init_scale"]}_lr={c["learning_rate"]}_b={c["batch_size"]}_xi={c["xi"][0]},{c["xi"][1]}_T={c["num_epochs"]}'
     dir = f'results/figures/numerical_integration/{mini_key}/'
     os.makedirs(dir, exist_ok=True)
     fig, axs = plot_rf_evolution(w_model, figsize=(15, 5), cmap='gray')
@@ -101,16 +109,18 @@ if __name__ == '__main__':
     
     w_init = w_model[0]
     xi = c['xi']
-    cov1 = build_non_gaussian_covariance(c['num_dimensions'], xi=xi[0], g=c['gain'])
-    cov0 = build_non_gaussian_covariance(c['num_dimensions'], xi=xi[1], g=c['gain'])
+    cov1 = build_non_gaussian_covariance(c['num_dimensions'], xi=xi[1], g=c['gain'])
+    cov0 = build_non_gaussian_covariance(c['num_dimensions'], xi=xi[0], g=c['gain'])
     
     w_sim = integrate(
         w_init=w_init,
         cov1=cov1,
         cov0=cov0,
         tau=c['learning_rate'],
-        num_steps=c['num_steps'],
-        phi=phi, # this is the correct phi for large g
+        num_steps=c['num_epochs'],
+        # phi=phi, # this is the correct phi for large g
+        # phi=lambda x: jnp.sqrt(2/jnp.pi) * x,
+        phi=phi if c['gain'] > 1 else lambda x: jnp.sqrt(2/jnp.pi) * x, # high/low gain
         return_all=True
     )
     eval_int = c['evaluation_interval']

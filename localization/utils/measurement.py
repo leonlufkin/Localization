@@ -10,7 +10,7 @@ from scipy.stats import entropy as scipy_entropy
 def ipr(weights):
     if weights.ndim == 1:
         jnp.sum(jnp.power(weights, 4)) / jnp.sum(jnp.square(weights)) ** 2
-    return jnp.sum(jnp.power(weights, 4), axis=1) / jnp.sum(jnp.square(weights), axis=1) ** 2
+    return jnp.sum(jnp.power(weights, 4), axis=1) / (jnp.sum(jnp.square(weights), axis=1) ** 2)
 
 def entropy(weights, low=-10, upp=10, delta=0.1, base=2):
     entropies = jnp.zeros(weights.shape[0])
