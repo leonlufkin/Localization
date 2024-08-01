@@ -9,8 +9,8 @@ from localization.experiments import simulate, simulate_or_load
 
 if __name__ == '__main__':
     
-    from counting.utils.launcher import get_executor, tupify
-    from counting.utils.submit import submit_jobs, product_kwargs
+    from localization.utils.launcher import get_executor, tupify
+    from localization.utils.submit import submit_jobs, product_kwargs
 
     executor = get_executor(
         job_name="model_sweep_rebuttal",
