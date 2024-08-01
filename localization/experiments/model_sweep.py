@@ -1,6 +1,8 @@
 # export PYTHONPATH="${PYTHONPATH}:/nfs/nhome/live/leonl" # <- this should allow us to import from submit.py
 
 import numpy as np
+import jax
+import jax.numpy as jnp
 import optax
 from localization import datasets, models, samplers
 from localization.experiments import simulate, simulate_or_load
@@ -11,12 +13,12 @@ if __name__ == '__main__':
     from counting.utils.submit import submit_jobs, product_kwargs
 
     executor = get_executor(
-        job_name="model_sweep",
+        job_name="model_sweep_rebuttal",
         cluster="slurm",
         partition="cpu",
-        timeout_min=60,
+        timeout_min=600,
         mem_gb=10,
-        parallelism=30,
+        parallelism=3,#300,
         gpus_per_node=0,
     )
     
@@ -44,11 +46,13 @@ if __name__ == '__main__':
     # )
 
     ## Define base config
-    config_ = dict(
+    config = dict(
         # data config
-        num_dimensions=40,
-        xi1=2,
-        xi2=1,
+        # num_dimensions=40,
+        # xi1=2,
+        # xi2=1,
+        xi=(0.3, 0.7),
+        # dataset_cls=datasets.NonlinearGPDataset,
         batch_size=50000,
         support=(-1, 1), # defunct
         class_proportion=0.5,
@@ -56,11 +60,14 @@ if __name__ == '__main__':
         model_cls=models.SimpleNet,
         sampler_cls=samplers.EpochSampler,
         init_fn=models.xavier_normal_init,
+        init_scale=0.001,
         num_hiddens=1,
         activation='relu',
         use_bias=False,
+        learning_rate=0.01,
+        num_epochs=10000,
         # learning config
-        evaluation_interval=10,
+        evaluation_interval=100,
         optimizer_fn=optax.sgd,
         # experiment config
         save_=True,
@@ -68,37 +75,31 @@ if __name__ == '__main__':
     )
     
     # helper function to only sweep across subset of hyperparameters
-    def filter(**kwargs):
-        init_scale = kwargs['init_scale']
-        activation = kwargs['activation']
-        gain = kwargs['gain']
-        learning_rate = kwargs['learning_rate']
-        num_epochs = kwargs['num_epochs']
-        
-        if learning_rate == 0.1 and num_epochs == 10000:
-            return
-        if learning_rate == 0.02 and num_epochs == 2000:
-            return
-        
-        if learning_rate == 0.1 and (gain == 3 or gain == 100) and init_scale == 0.01: # already ran
-            return
-            
+    def filter(**config):
         # NOTE: using `simulate_or_load` will effectively skip jobs that have already been run
         #       if one needs to re-run jobs (specifically when using a new evaluation_interval), use `simulate` instead
-        return simulate_or_load(**kwargs)
+        dataset_cls = config['dataset_cls']
+        
+        out = []
+        if dataset_cls == datasets.NonlinearGPDataset:
+            for g in jnp.logspace(-2, 2, 10):
+                out.append(simulate_or_load(**config, gain=g))
+        elif dataset_cls == datasets.NortaDataset:
+            for k in jnp.linspace(1, 10, 10):
+                out.append(simulate_or_load(**config, marginal_qdf=datasets.AlgQDF(k=k)))
+            
+        return out
 
     ## Submit jobs
     jobs = submit_jobs(
         executor=executor,
         func=filter,
         kwargs_array=product_kwargs(
-            **tupify(config_),
+            **tupify(config),
             # These are the settings we're sweeping over
             seed=tuple(np.arange(30)),
-            init_scale=(0.001, 0.01, 0.5), # already did 0.01
-            dataset_cls=(datasets.NonlinearGPDataset, datasets.NLGPGaussianCloneDataset,),
-            gain=(1.1, 3, 100,),
-            learning_rate=(0.02, 0.1,),
-            num_epochs=(10000, 2000),
+            num_dimensions=(40, 100, 400),
+            # gain / AlgQDF(k)
+            dataset_cls=(datasets.NonlinearGPDataset, datasets.NortaDataset,),
         ),
     )
