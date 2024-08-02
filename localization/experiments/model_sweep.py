@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
     ## Submit jobs
     jobs = submit_jobs(
-        executor=gpu_executor,
+        executor=cpu_executor,
         func=filter,
         kwargs_array=product_kwargs(
             **tupify(config),
