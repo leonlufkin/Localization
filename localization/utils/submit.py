@@ -19,7 +19,6 @@ from tqdm.asyncio import tqdm
 
 import submitit
 
-
 class Executor(submitit.AutoExecutor):
     def starmap_array(self, fn: Callable, iterable: Iterable[Any]) -> List[Any]:
         submissions = [

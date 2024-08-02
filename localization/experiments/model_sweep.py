@@ -7,6 +7,35 @@ import optax
 from localization import datasets, models, samplers
 from localization.experiments import simulate, simulate_or_load
 
+## Define base config
+config = dict(
+    # data config
+    # num_dimensions=40,
+    # xi1=2,
+    # xi2=1,
+    xi=(0.3, 0.7),
+    # dataset_cls=datasets.NonlinearGPDataset,
+    batch_size=50000, # FIXME: was 5000, bumped up for Algk data
+    adjust=(-1.0, 1.0), # not really used
+    class_proportion=0.5,
+    # model config
+    model_cls=models.SimpleNet,
+    sampler_cls=samplers.EpochSampler,
+    init_fn=models.xavier_normal_init,
+    init_scale=0.001,
+    num_hiddens=1,
+    activation='relu',
+    use_bias=False,
+    learning_rate=0.1,
+    num_epochs=1000,
+    # learning config
+    evaluation_interval=10,
+    optimizer_fn=optax.sgd,
+    # experiment config
+    save_=True,
+    wandb_=False,
+)
+
 if __name__ == '__main__':
     
     from localization.utils.launcher import get_executor, tupify
@@ -30,35 +59,6 @@ if __name__ == '__main__':
         mem_gb=10,
         parallelism=20,
         gpus_per_node=1,
-    )
-    
-    ## Define base config
-    config = dict(
-        # data config
-        # num_dimensions=40,
-        # xi1=2,
-        # xi2=1,
-        xi=(0.3, 0.7),
-        # dataset_cls=datasets.NonlinearGPDataset,
-        batch_size=5000,
-        adjust=(-1.0, 1.0), # not really used
-        class_proportion=0.5,
-        # model config
-        model_cls=models.SimpleNet,
-        sampler_cls=samplers.EpochSampler,
-        init_fn=models.xavier_normal_init,
-        init_scale=0.001,
-        num_hiddens=1,
-        activation='relu',
-        use_bias=False,
-        learning_rate=0.1,
-        num_epochs=1000,
-        # learning config
-        evaluation_interval=10,
-        optimizer_fn=optax.sgd,
-        # experiment config
-        save_=True,
-        wandb_=False,
     )
     
     # helper function to only sweep across subset of hyperparameters
@@ -85,8 +85,9 @@ if __name__ == '__main__':
             **tupify(config),
             # These are the settings we're sweeping over
             seed=tuple(np.arange(30)),
-            num_dimensions=(40, 100, 400),
+            num_dimensions=(40,),# 100, 400),
             # gain / AlgQDF(k)
-            dataset_cls=(datasets.NonlinearGPDataset, datasets.NortaDataset,),
+            # dataset_cls=(datasets.NonlinearGPDataset, datasets.NortaDataset,),
+            dataset_cls=(datasets.NortaDataset,),
         ),
     )

@@ -45,6 +45,7 @@ class LaplaceQDF(QDF):
 
 class AlgQDF(QDF):
     def __init__(self, k=5):
+        self.k = k
         alg_qdf = lambda x: (2*x-1) / ( 1 - jnp.abs(2*x-1)**k )**(1/k)
         alg_cdf = lambda x: 0.5 * (1 + x / (1 + jnp.abs(x)**k)**(1/k))
         # Standardize (no explicit form for variance)

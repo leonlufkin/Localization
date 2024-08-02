@@ -2,6 +2,7 @@ import os
 import datetime
 from pathlib import Path
 from submit import get_submitit_executor, submit_jobs, product_kwargs
+from tqdm import tqdm
 
 def get_timestamp():
   """
