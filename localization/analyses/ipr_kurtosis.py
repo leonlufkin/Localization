@@ -15,6 +15,12 @@ from functools import partial
 import ipdb
 import matplotlib.pyplot as plt
 
+def load_or_na(**kwargs):
+    try:
+        return load(**kwargs)
+    except ValueError as e:
+        print(e)
+        return jnp.nan * jnp.zeros((kwargs['num_epochs'] // kwargs['evaluation_interval'] + 1, 1, kwargs['num_dimensions']))
 
 def compute_kurtosis(dataset_cls, freeze, kurtosis_param_name, kurtosis_param_value):
     # get samples
@@ -38,17 +44,17 @@ if __name__ == '__main__':
     # dataset_cls = (datasets.NonlinearGPDataset, datasets.NortaDataset,)
     gains = jnp.logspace(-2, 2, 10)
     ks = jnp.linspace(1, 10, 10)
-    num_dimensions = 400
+    num_dimensions = 40
     
     sweep, configs = sweep_func(
-        load,
+        load_or_na,
         # lambda **kwargs: load(**kwargs)[1], # just weights
         kwargs_array=product_kwargs(
             **tupify(config),
             seed=tuple(np.arange(30,)),
             num_dimensions=(num_dimensions,),
-            # dataset_cls=(datasets.NonlinearGPDataset,), gain=tuple(gains),
-            dataset_cls=(datasets.NortaDataset,), marginal_qdf=tuple(datasets.AlgQDF(k) for k in ks)
+            dataset_cls=(datasets.NonlinearGPDataset,), gain=tuple(gains),
+            # dataset_cls=(datasets.NortaDataset,), marginal_qdf=tuple(datasets.AlgQDF(k) for k in ks)
         ),
     )
     configs = pd.DataFrame(configs)
@@ -63,35 +69,35 @@ if __name__ == '__main__':
     axs[0,1].plot(final_weights[39])
     axs[1,0].plot(final_weights[1])
     axs[1,1].plot(final_weights[31])
-    # fig.savefig(f'results/figures/ipr_kurtosis/nlgp_debug_{num_dimensions}.png', dpi=300, bbox_inches='tight')
-    fig.savefig(f'results/figures/ipr_kurtosis/algk_debug_{num_dimensions}.png', dpi=300, bbox_inches='tight')
+    fig.savefig(f'results/figures/ipr_kurtosis/nlgp_debug_{num_dimensions}.png', dpi=300, bbox_inches='tight')
+    # fig.savefig(f'results/figures/ipr_kurtosis/algk_debug_{num_dimensions}.png', dpi=300, bbox_inches='tight')
     
     # plot gain vs ipr
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-    # kurts = jax.vmap(compute_kurtosis, in_axes=(None, None, None, 0))(
-    #     datasets.NonlinearGPDataset, 
-    #     dict(**config, key=jr.PRNGKey(0), num_dimensions=num_dimensions,),
-    #     'gain', gains,
-    # )
-    kurts = jnp.stack(list(map(lambda x: compute_kurtosis(
-                datasets.NortaDataset,
-                dict(**config, key=jr.PRNGKey(0), num_dimensions=num_dimensions,),
-                'marginal_qdf', x
-            ),
-            [datasets.AlgQDF(k) for k in ks]
-        )))
+    kurts = jax.vmap(compute_kurtosis, in_axes=(None, None, None, 0))(
+        datasets.NonlinearGPDataset, 
+        dict(**config, key=jr.PRNGKey(0), num_dimensions=num_dimensions,),
+        'gain', gains,
+    )
+    # kurts = jnp.stack(list(map(lambda x: compute_kurtosis(
+    #             datasets.NortaDataset,
+    #             dict(**config, key=jr.PRNGKey(0), num_dimensions=num_dimensions,),
+    #             'marginal_qdf', x
+    #         ),
+    #         [datasets.AlgQDF(k) for k in ks]
+    #     )))
     print(kurts)
-    # iprs = configs[['gain']].assign(ipr=ipr(final_weights)).groupby('gain').agg(['mean', 'std']).to_numpy()
-    iprs = configs[['k']].assign(ipr=ipr(final_weights)).groupby('k').agg(['mean', 'std']).to_numpy()
+    iprs = configs[['gain']].assign(ipr=ipr(final_weights)).groupby('gain').agg(['mean', 'std']).to_numpy()
+    # iprs = configs[['k']].assign(ipr=ipr(final_weights)).groupby('k').agg(['mean', 'std']).to_numpy()
     print(iprs)
-    kurts = kurts[3:]
-    iprs = iprs[3:]
+    # kurts = kurts[3:]
+    # iprs = iprs[3:]
     ax.scatter(kurts-3, iprs[:,0], c='k', s=10) # means
     ax.errorbar(kurts-3, iprs[:,0], yerr=iprs[:,1], fmt='o', c='k', alpha=0.5) # stds
     ax.set_xlabel('Kurtosis')
     ax.set_ylabel('IPR')
-    # fig.savefig(f'results/figures/ipr_kurtosis/nlgp_kurtosis_vs_ipr_{num_dimensions}.png', dpi=300, bbox_inches='tight')
-    fig.savefig(f'results/figures/ipr_kurtosis/algk_kurtosis_vs_ipr_{num_dimensions}.png', dpi=300, bbox_inches='tight')
+    fig.savefig(f'results/figures/ipr_kurtosis/nlgp_kurtosis_vs_ipr_{num_dimensions}.png', dpi=300, bbox_inches='tight')
+    # fig.savefig(f'results/figures/ipr_kurtosis/algk_kurtosis_vs_ipr_{num_dimensions}.png', dpi=300, bbox_inches='tight')
     
     
     
