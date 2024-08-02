@@ -40,7 +40,7 @@ if __name__ == '__main__':
         # xi2=1,
         xi=(0.3, 0.7),
         # dataset_cls=datasets.NonlinearGPDataset,
-        batch_size=50000,
+        batch_size=5000,
         adjust=(-1.0, 1.0), # not really used
         class_proportion=0.5,
         # model config
@@ -54,7 +54,7 @@ if __name__ == '__main__':
         learning_rate=0.1,
         num_epochs=1000,
         # learning config
-        evaluation_interval=100,
+        evaluation_interval=10,
         optimizer_fn=optax.sgd,
         # experiment config
         save_=True,
