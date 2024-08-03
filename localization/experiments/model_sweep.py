@@ -84,7 +84,7 @@ if __name__ == '__main__':
         kwargs_array=product_kwargs(
             **tupify(config),
             # These are the settings we're sweeping over
-            seed=tuple(np.arange(30)),
+            seed=tuple(np.arange(100)),
             num_dimensions=(40,),# 100, 400),
             # gain / AlgQDF(k)
             # dataset_cls=(datasets.NonlinearGPDataset, datasets.NortaDataset,),

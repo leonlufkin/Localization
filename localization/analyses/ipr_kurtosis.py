@@ -20,8 +20,9 @@ def load_or_na(**kwargs):
         return load(**kwargs)
     except ValueError as e:
         print(e)
-        ipdb.set_trace()
-        return jnp.nan * jnp.zeros((kwargs['num_epochs'] // kwargs['evaluation_interval'] + 1, 1, kwargs['num_dimensions']))
+        # ipdb.set_trace()
+        # return jnp.nan * jnp.zeros((kwargs['num_epochs'] // kwargs['evaluation_interval'] + 1, 1, kwargs['num_dimensions']))
+        return None, jnp.nan * jnp.zeros((1, 1, kwargs['num_dimensions']))
 
 def compute_kurtosis(dataset_cls, freeze, kurtosis_param_name, kurtosis_param_value):
     # get samples
@@ -39,6 +40,7 @@ if __name__ == '__main__':
     from localization.experiments.model_sweep import config    
     from localization import datasets, models
     
+    config['batch_size'] = 5000
     # sweep params
     # seed = tuple(np.arange(30)),
     # num_dimensions = (40, 100, 400,)
@@ -55,17 +57,17 @@ if __name__ == '__main__':
             **tupify(config),
             seed=tuple(np.arange(30,)),
             num_dimensions=(num_dimensions,),
-            # dataset_cls=(datasets.NonlinearGPDataset,), gain=tuple(gains),
-            dataset_cls=(datasets.NortaDataset,), marginal_qdf=tuple(datasets.AlgQDF(k) for k in ks)
+            dataset_cls=(datasets.NonlinearGPDataset,), gain=tuple(gains),
+            # dataset_cls=(datasets.NortaDataset,), marginal_qdf=tuple(datasets.AlgQDF(k) for k in ks)
         ),
     )
     configs = pd.DataFrame(configs)
     # configs['gain'] = configs['gain'].astype(float)
-    configs['k'] = jnp.stack([ c.k for c in configs['marginal_qdf'] ])
-    ipdb.set_trace()
-    metrics = jnp.stack([ s[0] for s in sweep ])
-    weights = jnp.stack([ s[1] for s in sweep ])
-    final_weights = weights[:, -1, 0, :]
+    # configs['k'] = jnp.stack([ c.k for c in configs['marginal_qdf'] ])
+    # metrics = jnp.stack([ s[0] for s in sweep ])
+    # weights = jnp.stack([ s[1] for s in sweep ])
+    # final_weights = weights[:, -1, 0, :]
+    final_weights = jnp.stack([ s[1][-1,0] for s in sweep ])
     
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
     axs[0,0].plot(final_weights[19])
@@ -90,17 +92,18 @@ if __name__ == '__main__':
             [datasets.AlgQDF(k) for k in ks]
         )))
     print(kurts)
-    iprs = configs[['gain']].assign(ipr=ipr(final_weights)).groupby('gain').agg(['mean', 'std']).to_numpy()
-    # iprs = configs[['k']].assign(ipr=ipr(final_weights)).groupby('k').agg(['mean', 'std']).to_numpy()
+    # iprs = configs[['gain']].assign(ipr=ipr(final_weights)).groupby('gain').agg(['mean', 'std']).to_numpy()
+    iprs = configs[['k']].assign(ipr=ipr(final_weights)).groupby('k').agg(['mean', 'std']).to_numpy()
     print(iprs)
-    # kurts = kurts[3:]
-    # iprs = iprs[3:]
+    kurts = kurts[3:]
+    iprs = iprs[3:]
     ax.scatter(kurts-3, iprs[:,0], c='k', s=10) # means
     ax.errorbar(kurts-3, iprs[:,0], yerr=iprs[:,1], fmt='o', c='k', alpha=0.5) # stds
     ax.set_xlabel('Kurtosis')
     ax.set_ylabel('IPR')
-    # fig.savefig(f'results/figures/ipr_kurtosis/nlgp_kurtosis_vs_ipr_{num_dimensions}.png', dpi=300, bbox_inches='tight')
-    fig.savefig(f'results/figures/ipr_kurtosis/algk_kurtosis_vs_ipr_{num_dimensions}.png', dpi=300, bbox_inches='tight')
+    fig.savefig(f'results/figures/ipr_kurtosis/nlgp_kurtosis_vs_ipr_{num_dimensions}.png', dpi=300, bbox_inches='tight')
+    # fig.savefig(f'results/figures/ipr_kurtosis/algk_kurtosis_vs_ipr_{num_dimensions}.png', dpi=300, bbox_inches='tight')
+    ipdb.set_trace()
     
     
     
