@@ -77,7 +77,7 @@ if __name__ == '__main__':
     
     c = dict(
         seed=0, # 0
-        num_dimensions=100, # 100
+        num_dimensions=40, # 100
         num_hiddens=1,
         dim=1,
         gain=1,#100.,#0.01,#100,#0.01,
