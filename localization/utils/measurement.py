@@ -1,4 +1,5 @@
 # import os
+import numpy as np
 import jax.numpy as jnp
 # import matplotlib.pyplot as plt
 from scipy.stats import entropy as scipy_entropy
@@ -8,9 +9,15 @@ from scipy.stats import entropy as scipy_entropy
 # LOCALIZATION METRICS
 
 def ipr(weights):
+    # Check if JAX array
+    if isinstance(weights, jnp.ndarray):
+        if weights.ndim == 1:
+            jnp.sum(jnp.power(weights, 4)) / jnp.sum(jnp.square(weights)) ** 2
+        return jnp.sum(jnp.power(weights, 4), axis=1) / (jnp.sum(jnp.square(weights), axis=1) ** 2)
+    # Else, treat as numpy array
     if weights.ndim == 1:
-        jnp.sum(jnp.power(weights, 4)) / jnp.sum(jnp.square(weights)) ** 2
-    return jnp.sum(jnp.power(weights, 4), axis=1) / (jnp.sum(jnp.square(weights), axis=1) ** 2)
+        np.sum(np.power(weights, 4)) / np.sum(jnp.square(weights)) ** 2
+    return np.sum(np.power(weights, 4), axis=1) / (np.sum(np.square(weights), axis=1) ** 2)
 
 def entropy(weights, low=-10, upp=10, delta=0.1, base=2):
     entropies = jnp.zeros(weights.shape[0])

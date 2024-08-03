@@ -86,7 +86,7 @@ if __name__ == '__main__':
         model_cls=models.SimpleNet,
         use_bias=False,
         optimizer_fn=optax.sgd,
-        learning_rate=0.05,
+        learning_rate=0.01,
         batch_size=50000,#10000,
         num_epochs=5000,
         dataset_cls=datasets.NonlinearGPDataset,
