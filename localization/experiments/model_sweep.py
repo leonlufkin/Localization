@@ -72,8 +72,8 @@ if __name__ == '__main__':
             for g in jnp.logspace(-2, 2, 10):
                 out.append(simulate_or_load(**config, gain=g))
         elif dataset_cls == datasets.NortaDataset:
-            for k in jnp.linspace(1, 10, 10):
-                out.append(simulate_or_load(**config, marginal_qdf=datasets.AlgQDF(k=k)))
+            for k in jnp.array([4.1, 4.3, 4.5, 4.74, 5.0, 5.4, 6.1, 7.7, 10., 50.]): # jnp.linspace(1, 10, 10):
+                out.append(simulate_or_load(**config, marginal_qdf=datasets.AlgQDF(k=k), k=k))
             
         return out
 
