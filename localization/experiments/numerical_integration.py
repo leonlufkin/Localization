@@ -98,7 +98,7 @@ if __name__ == '__main__':
         init_fn=models.xavier_normal_init,
         loss_fn='mse',
         save_=True,
-        evaluation_interval=100,
+        evaluation_interval=500,
     )
     w_model = simulate_or_load(**c)[0][:,0]
     mini_key = f'seed={c["seed"]}_L={c["num_dimensions"]}_g={c["gain"]}_is={c["init_scale"]}_lr={c["learning_rate"]}_b={c["batch_size"]}_xi={c["xi"][0]},{c["xi"][1]}_T={c["num_epochs"]}'
@@ -146,12 +146,12 @@ if __name__ == '__main__':
     fig.savefig(f'{dir}/ipr_mse.png')
     
     # Plot timeshot after 25 steps
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-    ax1.plot(w_model[25])
-    ax1.set_title('Empirical')
-    ax2.plot(w_sim[25])
-    ax2.set_title('Analytical')
-    fig.savefig(f'{dir}/timeshot.png')
+    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+    # ax1.plot(w_model[25])
+    # ax1.set_title('Empirical')
+    # ax2.plot(w_sim[25])
+    # ax2.set_title('Analytical')
+    # fig.savefig(f'{dir}/timeshot.png')
         
     
     
