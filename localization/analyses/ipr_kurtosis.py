@@ -43,7 +43,7 @@ if __name__ == '__main__':
     # num_dimensions = (40, 100, 400,)
     # dataset_cls = (datasets.NonlinearGPDataset, datasets.NortaDataset,)
     gains = jnp.logspace(-2, 2, 10)
-    ks = jnp.linspace(1, 10, 10)
+    ks = jnp.array([4.1, 4.3, 4.5, 4.74, 5.0, 5.4, 6.1, 7.7, 10., 50.]) # jnp.linspace(1, 10, 10)
     num_dimensions = 40
     
     sweep, configs = sweep_func(
