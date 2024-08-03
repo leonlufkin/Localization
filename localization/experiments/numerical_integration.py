@@ -104,6 +104,7 @@ if __name__ == '__main__':
     mini_key = f'seed={c["seed"]}_L={c["num_dimensions"]}_g={c["gain"]}_is={c["init_scale"]}_lr={c["learning_rate"]}_b={c["batch_size"]}_xi={c["xi"][0]},{c["xi"][1]}_T={c["num_epochs"]}'
     dir = f'results/figures/numerical_integration/{mini_key}/'
     os.makedirs(dir, exist_ok=True)
+    ipdb.set_trace()
     fig, axs = plot_rf_evolution(w_model, figsize=(15, 5), cmap='gray')
     fig.savefig(f'{dir}/empirical.png')
     
