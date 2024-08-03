@@ -18,7 +18,7 @@ def load(**kwargs):
   if path_key + '.npz' in os.listdir(weightwd):
     print('Already simulated')
     data = jnp.load(weightwd + '/' + path_key + '.npz', allow_pickle=True)
-    return data['metrics'], data['weights']
+    return data['weights'], data['metrics']
   # print('File ' + path_key + '.npz' + ' not found')
   # try removing the seed, accounts for change in make_key implemented on 12-04-2023 that adds seed to path_key
   if 'seed' in kwargs.keys():
