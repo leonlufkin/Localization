@@ -80,7 +80,7 @@ if __name__ == '__main__':
         num_dimensions=100, # 100
         num_hiddens=1,
         dim=1,
-        gain=100.,#0.01,#100,#0.01,
+        gain=1,#100.,#0.01,#100,#0.01,
         init_scale=0.001,
         activation='relu',
         model_cls=models.SimpleNet,
