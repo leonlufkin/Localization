@@ -8,6 +8,7 @@
 
 import numpy as np
 import jax
+jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from jax import Array
@@ -75,20 +76,25 @@ if __name__ == '__main__':
     import optax
     import os
     
+    # Check dtype 
+    x = jax.random.uniform(jax.random.key(0), (1000,), dtype=jnp.float64)
+    print(x.dtype) # --> dtype('float64')
+    
+    # Config
     c = dict(
         seed=0, # 0
         num_dimensions=40, # 100
         num_hiddens=1,
         dim=1,
         gain=100.,#0.01,#100,#0.01,
-        init_scale=0.001,
+        init_scale=0.1, # 0.001
         activation='relu',
         model_cls=models.SimpleNet,
         use_bias=False,
         optimizer_fn=optax.sgd,
-        learning_rate=0.001,
+        learning_rate=0.05,
         batch_size=25000,#10000,
-        num_epochs=10000,
+        num_epochs=5000,
         dataset_cls=datasets.NonlinearGPDataset,
         xi=(0.3, 0.7), #(0.7, 0.3,),
         # num_steps=10000,
@@ -98,7 +104,7 @@ if __name__ == '__main__':
         init_fn=models.xavier_normal_init,
         loss_fn='mse',
         save_=True,
-        evaluation_interval=500,
+        evaluation_interval=50,
     )
     w_model = simulate_or_load(**c)[0][:,0]
     mini_key = f'seed={c["seed"]}_L={c["num_dimensions"]}_g={c["gain"]}_is={c["init_scale"]}_lr={c["learning_rate"]}_b={c["batch_size"]}_xi={c["xi"][0]},{c["xi"][1]}_T={c["num_epochs"]}'
