@@ -47,8 +47,7 @@ if __name__ == '__main__':
     # RE-RUN, but much longer
     config.update(dict(
         num_epochs=10000, evaluation_interval=100,
-        # learning_rate=0.05,
-        # init_scale=0.01,
+        batch_size=5000,
     ))
     weights = simulate_or_load(
         **config, 

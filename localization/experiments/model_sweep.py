@@ -27,9 +27,9 @@ config = dict(
     activation='relu',
     use_bias=False,
     learning_rate=0.1,
-    num_epochs=1000,
+    num_epochs=10000,
     # learning config
-    evaluation_interval=10,
+    evaluation_interval=100,
     optimizer_fn=optax.sgd,
     # experiment config
     save_=True,
