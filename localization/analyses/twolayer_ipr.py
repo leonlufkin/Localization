@@ -37,7 +37,7 @@ if __name__ == '__main__':
     config.update(dict(
         num_epochs=20000, evaluation_interval=200,
         num_hiddens=10,
-        init_scale=1.0,#0.1,
+        init_scale=0.001,#0.1,
         learning_rate=5.,
         batch_size=5000,
     ))
