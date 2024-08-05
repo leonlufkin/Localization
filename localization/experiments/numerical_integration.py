@@ -80,21 +80,23 @@ if __name__ == '__main__':
     x = jax.random.uniform(jax.random.key(0), (1000,), dtype=jnp.float64)
     print(x.dtype) # --> dtype('float64')
     
+    # seed=0_L=100_g=100.0_is=0.001_lr=0.01_b=50000_xi=0.3,0.7_T=5000
+    
     # Config
     c = dict(
         seed=0, # 0
-        num_dimensions=40, # 100
+        num_dimensions=100, # 100
         num_hiddens=1,
         dim=1,
         gain=100.,#0.01,#100,#0.01,
-        init_scale=0.1, # 0.001
+        init_scale=0.001, # 0.001
         activation='relu',
         model_cls=models.SimpleNet,
         use_bias=False,
         optimizer_fn=optax.sgd,
-        learning_rate=0.05,
-        batch_size=100000,#10000,
-        num_epochs=2000,
+        learning_rate=0.01,
+        batch_size=50000,#10000,
+        num_epochs=5000,
         dataset_cls=datasets.NonlinearGPDataset,
         xi=(0.3, 0.7), #(0.7, 0.3,),
         # num_steps=10000,
@@ -104,7 +106,7 @@ if __name__ == '__main__':
         init_fn=models.xavier_normal_init,
         loss_fn='mse',
         save_=True,
-        evaluation_interval=20,
+        evaluation_interval=50,
     )
     w_model = simulate_or_load(**c)[0][:,0]
     mini_key = f'seed={c["seed"]}_L={c["num_dimensions"]}_g={c["gain"]}_is={c["init_scale"]}_lr={c["learning_rate"]}_b={c["batch_size"]}_xi={c["xi"][0]},{c["xi"][1]}_T={c["num_epochs"]}'
@@ -152,12 +154,44 @@ if __name__ == '__main__':
     fig.savefig(f'{dir}/ipr_mse.png')
     
     # Plot timeshot after 25 steps
-    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-    # ax1.plot(w_model[25])
-    # ax1.set_title('Empirical')
-    # ax2.plot(w_sim[25])
-    # ax2.set_title('Analytical')
-    # fig.savefig(f'{dir}/timeshot.png')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+    # 40 steps
+    ax1.plot(w_model[40], label='Empirical')
+    ax1.plot(w_sim[40], label='Analytical')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('Weight magnitude')
+    ax1.set_title('Weights at t=40')
+    # 60 steps
+    ax2.plot(w_model[60], label='Empirical')
+    ax2.plot(w_sim[60], label='Analytical')
+    ax2.set_xlabel('Time')
+    ax2.set_ylabel('Weight magnitude')
+    ax2.set_title('Weights at t=60')
+    ax2.legend()
+    fig.savefig(f'{dir}/timeshot.png')
+    
+    # Compare IPRs and difference across time
+    from localization.utils import ipr
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 4))
+    ax1.plot(ipr(w_model), label='Empirical')
+    ax1.plot(ipr(w_sim), label='Analytical')
+    ax1.set_xlabel('Time')
+    ax1.set_ylabel('IPR')
+    ax1.set_title('IPR')
+    ax1.legend()
+    diff = jnp.sqrt(jnp.square(w_model - w_sim).mean(axis=1))
+    ax2.plot(diff)
+    ax2.set_xlabel('Time')
+    ax2.set_ylabel('RMSE')
+    ax2.set_title('l2(model - analytical)')
+    # Zooming in for ax3
+    for line in ax1.get_lines():
+        ax3.plot(line.get_xdata(), line.get_ydata(), label=line.get_label())
+    ax3.set_xlim(ax1.get_xlim())
+    ax3.set_ylim((0,0.1))
+    ax3.axhline(y=0.03, color='r', linestyle='--')
+    ax3.legend()
+    fig.savefig(f'{dir}/ipr_mse_zoomed_in.png')
         
     
     

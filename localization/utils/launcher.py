@@ -11,12 +11,6 @@ def get_timestamp():
   """
   return datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-def tupify(d: dict):
-  """
-  Make all values in a dictionary 1-element tuples.
-  """
-  return { k: (v,) for k, v in d.items() }
-
 def get_executor(job_name, cluster="slurm", partition="cpu", timeout_min=60, mem_gb=10, parallelism=30, gpus_per_node=0):
   """
   Parameters

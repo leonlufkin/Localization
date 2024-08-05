@@ -47,7 +47,7 @@ def load_nlgp(gains, seeds, num_dimensions, config):
     )
     
     # Extract final weights
-    final_weights = np.stack([ s[1][-1,0].__array__() if s[1] is not None else np.nan * np.zeros(num_dimensions) for s in sweep ])
+    final_weights = np.stack([ s[0][-1,0].__array__() if s[1] is not None else np.nan * np.zeros(num_dimensions) for s in sweep ])
     
     # Compute kurtoses
     kurts = jax.vmap(compute_kurtosis, in_axes=(None, None, None, 0))(
@@ -58,8 +58,8 @@ def load_nlgp(gains, seeds, num_dimensions, config):
     
     # Compute IPR summaries
     x = ipr(final_weights).reshape(-1, len(gains))
-    m = x.mean(axis=0)
-    s = x.std(axis=0)
+    m = np.nanmean(x, axis=0)
+    s = np.nanstd(x, axis=0)
     return (m, s, kurts), configs, x
 
 def load_norta(ks, seeds, num_dimensions, config):
@@ -76,7 +76,7 @@ def load_norta(ks, seeds, num_dimensions, config):
     )
     
     # Extract final weights
-    final_weights = np.stack([ s[1][-1,0].__array__() if s[1] is not None else np.nan * np.zeros(num_dimensions) for s in sweep ])
+    final_weights = np.stack([ s[0][-1,0].__array__() if s[1] is not None else np.nan * np.zeros(num_dimensions) for s in sweep ])
     
     # Compute kurtoses
     kurts = jnp.stack(list(map(lambda x: compute_kurtosis(
@@ -89,8 +89,8 @@ def load_norta(ks, seeds, num_dimensions, config):
     
     # Compute IPR summaries
     x = ipr(final_weights).reshape(-1, len(ks))
-    m = x.mean(axis=0)
-    s = x.std(axis=0)
+    m = np.nanmean(x, axis=0)
+    s = np.nanstd(x, axis=0)
     return (m, s, kurts), configs, x
 
 if __name__ == '__main__':
@@ -106,8 +106,9 @@ if __name__ == '__main__':
     # # num_dimensions = (40, 100, 400,)
     # # dataset_cls = (datasets.NonlinearGPDataset, datasets.NortaDataset,)
     gains = jnp.logspace(-2, 2, 10)
-    # # ks = jnp.array([4.1, 4.3, 4.5, 4.74, 5.0, 5.4, 6.1, 7.7, 10., 50.]) # 
-    ks = jnp.linspace(1, 10, 10)
+    ks = jnp.array([4.1, 4.3, 4.5, 4.74, 5.0, 5.4, 6.1, 7.7, 10., 50.]) # 
+    # ks = jnp.linspace(1, 10, 10)
+    ks = jnp.concatenate([ks, jnp.linspace(4, 10, 7)])
     num_dimensions = 40
     
     # Plot
@@ -115,20 +116,21 @@ if __name__ == '__main__':
     # NLGP
     config_ = config.copy()
     config_['batch_size'] = 5000
-    # (m, s, kurts), _, iprs = load_nlgp(gains, jnp.arange(30), num_dimensions, config_)
-    # np.savez(f'results/figures/ipr_kurtosis/nlgp_kurtosis_vs_ipr_{num_dimensions}.npz', kurts=kurts, m=m, s=s, iprs=iprs)
+    # (m, s, kurts), configs, iprs = load_nlgp(gains, jnp.arange(30), num_dimensions, config_)
+    # np.savez(f'results/figures/ipr_kurtosis/nlgp_kurtosis_vs_ipr_{num_dimensions}.npz', kurts=kurts, m=m, s=s, configs=configs, iprs=iprs)
     data = np.load(f'results/figures/ipr_kurtosis/nlgp_kurtosis_vs_ipr_{num_dimensions}.npz')
     m, s, kurts = data['m'], data['s'], data['kurts']
     # m = np.median(data['iprs'], axis=0)
     ax.scatter(kurts-3, m, c='k', s=10, label='NLGP') # means
     ax.errorbar(kurts-3, m, yerr=s, fmt='o', c='k', alpha=0.5) # stds
     # NORTA
-    # (m, s, kurts), _, iprs = load_norta(ks, jnp.arange(30), num_dimensions, config)
-    # np.savez(f'results/figures/ipr_kurtosis/algk_kurtosis_vs_ipr_{num_dimensions}.npz', kurts=kurts, m=m, s=s, iprs=iprs)
+    # (m, s, kurts), configs, iprs = load_norta(ks, jnp.arange(100), num_dimensions, config)
+    # np.savez(f'results/figures/ipr_kurtosis/algk_kurtosis_vs_ipr_{num_dimensions}.npz', kurts=kurts, m=m, s=s, configs=configs, iprs=iprs)
     data = np.load(f'results/figures/ipr_kurtosis/algk_kurtosis_vs_ipr_{num_dimensions}.npz')
     m, s, kurts = data['m'], data['s'], data['kurts']
     # m = np.median(data['iprs'], axis=0)
-    m, s, kurts = m[3:], s[3:], kurts[3:]
+    ipdb.set_trace()
+    # m, s, kurts = m[3:], s[3:], kurts[3:]
     ax.scatter(kurts-3, m, c='r', s=10, label='AlgK') # means
     ax.errorbar(kurts-3, m, yerr=s, fmt='o', c='r', alpha=0.5) # stds
     # Labels
