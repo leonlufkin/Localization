@@ -15,7 +15,7 @@ config = dict(
     # xi2=1,
     xi=(0.3, 0.7),
     # dataset_cls=datasets.NonlinearGPDataset,
-    batch_size=50000, # FIXME: was 5000, bumped up for Algk data
+    batch_size=5000, # FIXME: was 5000, bumped up for Algk data
     adjust=(-1.0, 1.0), # not really used
     class_proportion=0.5,
     # model config
@@ -69,7 +69,7 @@ if __name__ == '__main__':
         
         out = []
         if dataset_cls == datasets.NonlinearGPDataset:
-            for g in jnp.logspace(-2, 2, 10):
+            for g in jnp.logspace(-1, 1, 10):
                 out.append(simulate_or_load(**config, gain=g))
         elif dataset_cls == datasets.NortaDataset:
             for k in jnp.array([4.1, 4.3, 4.5, 4.74, 5.0, 5.4, 6.1, 7.7, 10., 50.]): # jnp.linspace(1, 10, 10):
@@ -84,10 +84,10 @@ if __name__ == '__main__':
         kwargs_array=product_kwargs(
             **tupify(config),
             # These are the settings we're sweeping over
-            seed=tuple(np.arange(100)),
+            seed=tuple(np.arange(30)),
             num_dimensions=(40,),# 100, 400),
             # gain / AlgQDF(k)
-            # dataset_cls=(datasets.NonlinearGPDataset, datasets.NortaDataset,),
-            dataset_cls=(datasets.NortaDataset,),
+            dataset_cls=(datasets.NonlinearGPDataset, datasets.NortaDataset,),
+            # dataset_cls=(datasets.NortaDataset,),
         ),
     )
