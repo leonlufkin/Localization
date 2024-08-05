@@ -41,15 +41,14 @@ if __name__ == '__main__':
         dataset_cls=datasets.NortaDataset,
         marginal_qdf=datasets.AlgQDF(ks[-3]),
     )[0]
-    
     fig, ax = plot_rf_evolution(weights, figsize=(15,5), cmap='gray')
     fig.savefig(f'results/figures/low_ipr/original_{problem_seed}.png')
     
     # RE-RUN, but much longer
     config.update(dict(
         num_epochs=10000, evaluation_interval=100,
-        learning_rate=0.05,
-        init_scale=0.01,
+        # learning_rate=0.05,
+        # init_scale=0.01,
     ))
     weights = simulate_or_load(
         **config, 
@@ -58,6 +57,7 @@ if __name__ == '__main__':
         dataset_cls=datasets.NortaDataset,
         marginal_qdf=datasets.AlgQDF(ks[-3]),
     )[0]
+    fig, ax = plot_rf_evolution(weights, figsize=(15,5), cmap='gray')
     fig.savefig(f'results/figures/low_ipr/longer_{problem_seed}.png')
     ipdb.set_trace()
     
