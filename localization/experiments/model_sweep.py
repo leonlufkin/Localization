@@ -38,7 +38,8 @@ config = dict(
 
 if __name__ == '__main__':
     
-    from localization.utils.launcher import get_executor, tupify
+    from localization.utils import tupify
+    from localization.utils.launcher import get_executor
     from localization.utils.submit import submit_jobs, product_kwargs
 
     cpu_executor = get_executor(
