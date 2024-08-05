@@ -46,10 +46,13 @@ if __name__ == '__main__':
         **config, 
         seed=seed,
         num_dimensions=40,
-        dataset_cls=datasets.NortaDataset,
-        marginal_qdf=datasets.AlgQDF(ks[-3]),
+        # dataset_cls=datasets.NortaDataset, marginal_qdf=datasets.AlgQDF(ks[-3]),
+        dataset_cls=datasets.NonlinearGPDataset, gain=100.,
     )[0]
     fig, axs = plot_rf_evolution(weights, num_rows=2, num_cols=5, figsize=(15,5), cmap='gray')
     fig.savefig(f'results/figures/twolayer_ipr/scm_{seed}.png')
+    
+    print(ipr(weights[-1]))
+    
     ipdb.set_trace()
     
