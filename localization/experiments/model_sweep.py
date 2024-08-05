@@ -23,13 +23,13 @@ config = dict(
     sampler_cls=samplers.EpochSampler,
     init_fn=models.xavier_normal_init,
     init_scale=0.001,
-    num_hiddens=1,
+    num_hiddens=10,#1,
     activation='relu',
     use_bias=False,
-    learning_rate=0.1,
-    num_epochs=10000,
+    learning_rate=5.,#0.1,
+    num_epochs=20000,#10000,
     # learning config
-    evaluation_interval=100,
+    evaluation_interval=200,#100,
     optimizer_fn=optax.sgd,
     # experiment config
     save_=True,
