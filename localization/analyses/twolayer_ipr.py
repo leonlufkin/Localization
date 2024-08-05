@@ -35,11 +35,11 @@ if __name__ == '__main__':
     
     # Update config: more gradient steps & more hidden neurons
     config.update(dict(
-        num_epochs=10000, evaluation_interval=100,
+        num_epochs=20000, evaluation_interval=200,
         num_hiddens=10,
         init_scale=1.0,#0.1,
-        learning_rate=2.,
-        batch_size=25000,
+        learning_rate=5.,
+        batch_size=5000,
     ))
     # 
     weights = simulate_or_load(
