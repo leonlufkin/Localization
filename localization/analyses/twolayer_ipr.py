@@ -49,4 +49,5 @@ if __name__ == '__main__':
     )[0]
     fig, axs = plot_rf_evolution(weights, figsize=(15,5), cmap='gray')
     fig.savefig(f'results/figures/twolayer_ipr/scm_{seed}.png')
+    ipdb.set_trace()
     
