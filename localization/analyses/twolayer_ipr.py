@@ -48,7 +48,7 @@ if __name__ == '__main__':
         dataset_cls=datasets.NortaDataset,
         marginal_qdf=datasets.AlgQDF(ks[-3]),
     )[0]
-    fig, axs = plot_rf_evolution(weights, figsize=(15,5), cmap='gray')
+    fig, axs = plot_rf_evolution(weights, num_rows=2, num_cols=5, figsize=(15,5), cmap='gray')
     fig.savefig(f'results/figures/twolayer_ipr/scm_{seed}.png')
     ipdb.set_trace()
     
