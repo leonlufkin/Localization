@@ -44,15 +44,15 @@ if __name__ == '__main__':
     
     fig, ax = plot_rf_evolution(weights, figsize=(15,5), cmap='gray')
     fig.savefig(f'results/figures/low_ipr/original_{problem_seed}.png')
-    ipdb.set_trace()
     
     # RE-RUN, but much longer
-    config_ = config.copy()
-    config_.pop('num_epochs')
-    config_.pop('evaluation_interval')
-    weights = simulate_or_load(
-        **config_, 
+    config.update(dict(
         num_epochs=10000, evaluation_interval=100,
+        learning_rate=0.05,
+        init_scale=0.01,
+    ))
+    weights = simulate_or_load(
+        **config, 
         seed=problem_seed,
         num_dimensions=40,
         dataset_cls=datasets.NortaDataset,
