@@ -49,9 +49,10 @@ if __name__ == '__main__':
     # RE-RUN, but much longer
     config_ = config.copy()
     config_.pop('num_epochs')
+    config_.pop('evaluation_interval')
     weights = simulate_or_load(
         **config_, 
-        num_epochs=10000,
+        num_epochs=10000, evaluation_interval=100,
         seed=problem_seed,
         num_dimensions=40,
         dataset_cls=datasets.NortaDataset,
