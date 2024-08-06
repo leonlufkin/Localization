@@ -94,7 +94,7 @@ if __name__ == '__main__':
         optimizer_fn=optax.sgd,
         learning_rate=0.05,#0.01,
         batch_size=50000,#50000,#10000,
-        num_epochs=5000,#10000,#5000,
+        num_epochs=20000,#10000,#5000,
         dataset_cls=datasets.NonlinearGPDataset,
         xi=(0.3, 0.7), #(0.7, 0.3,),
         # num_steps=10000,
