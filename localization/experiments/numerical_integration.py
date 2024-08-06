@@ -84,7 +84,7 @@ if __name__ == '__main__':
     
     # Config
     c = dict(
-        seed=0, # 0
+        seed=1,#0, # 0
         num_dimensions=100, # 100
         num_hiddens=1,
         dim=1,
@@ -110,6 +110,7 @@ if __name__ == '__main__':
     )
     w_model = simulate_or_load(**c)[0][:,0]
     mini_key = f'seed={c["seed"]}_L={c["num_dimensions"]}_g={c["gain"]}_is={c["init_scale"]}_lr={c["learning_rate"]}_b={c["batch_size"]}_xi={c["xi"][0]},{c["xi"][1]}_T={c["num_epochs"]}'
+    # ipdb.set_trace()
     dir = f'results/figures/numerical_integration/{mini_key}/'
     os.makedirs(dir, exist_ok=True)
     fig, axs = plot_rf_evolution(w_model, figsize=(15, 5), cmap='gray')

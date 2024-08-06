@@ -107,9 +107,9 @@ if __name__ == '__main__':
     from localization import datasets, models
     
     config['batch_size'] = 5000
-    # config['num_epochs'] = 10000
-    # config['learning_rate'] = 0.1
-    # config['num_hiddens'] = 1
+    config['num_epochs'] = 10000
+    config['learning_rate'] = 0.1
+    config['num_hiddens'] = 1
     # # sweep params
     # # seed = tuple(np.arange(30)),
     # # num_dimensions = (40, 100, 400,)
@@ -126,34 +126,35 @@ if __name__ == '__main__':
     num_hiddens = config['num_hiddens']
     
     # Plot
-    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+    fig, ax = plt.subplots(1, 1, figsize=(4, 2))
     # NLGP
     config_ = config.copy()
     # config_['batch_size'] = 5000
-    (m, s, kurts), configs, iprs = load_nlgp(gains, jnp.arange(30), num_dimensions, config_)
+    # (m, s, kurts), configs, iprs = load_nlgp(gains, jnp.arange(30), num_dimensions, config_)
     # np.savez(f'results/figures/ipr_kurtosis_{num_hiddens}/nlgp_kurtosis_vs_ipr_{num_dimensions}.npz', kurts=kurts, m=m, s=s, configs=configs, iprs=iprs)
-    # data = np.load(f'results/figures/ipr_kurtosis_{num_hiddens}/nlgp_kurtosis_vs_ipr_{num_dimensions}.npz')
-    # m, s, kurts = data['m'], data['s'], data['kurts']
+    data = np.load(f'results/figures/ipr_kurtosis_{num_hiddens}/nlgp_kurtosis_vs_ipr_{num_dimensions}.npz')
+    m, s, kurts = data['m'], data['s'], data['kurts']
     # ipdb.set_trace()
     # m = np.median(data['iprs'], axis=0)
-    ax.scatter(kurts-3, m, c='k', s=10, label='NLGP') # means
-    ax.errorbar(kurts-3, m, yerr=s, fmt='o', c='k', alpha=0.5) # stds
+    ax.scatter(kurts-3, m, c='k', s=8, label='NLGP') # means
+    ax.errorbar(kurts-3, m, yerr=s, fmt='none', c='k', alpha=0.5) # stds
     # NORTA
-    (m, s, kurts), configs, iprs = load_norta(ks, jnp.arange(30), num_dimensions, config)
+    # (m, s, kurts), configs, iprs = load_norta(ks, jnp.arange(30), num_dimensions, config)
     # np.savez(f'results/figures/ipr_kurtosis_{num_hiddens}/algk_kurtosis_vs_ipr_{num_dimensions}.npz', kurts=kurts, m=m, s=s, configs=configs, iprs=iprs)
-    # data = np.load(f'results/figures/ipr_kurtosis_{num_hiddens}/algk_kurtosis_vs_ipr_{num_dimensions}.npz')
-    # m, s, kurts = data['m'], data['s'], data['kurts']
+    data = np.load(f'results/figures/ipr_kurtosis_{num_hiddens}/algk_kurtosis_vs_ipr_{num_dimensions}.npz')
+    m, s, kurts = data['m'], data['s'], data['kurts']
     # m = np.median(data['iprs'], axis=0)
     # ipdb.set_trace()
     # m, s, kurts = m[3:], s[3:], kurts[3:]
-    ax.scatter(kurts-3, m, c='r', s=10, label='AlgK') # means
-    ax.errorbar(kurts-3, m, yerr=s, fmt='o', c='r', alpha=0.5) # stds
+    ax.scatter(kurts-3, m, c='r', s=8, label='Kur') # means
+    ax.errorbar(kurts-3, m, yerr=s, fmt='none', c='r', alpha=0.5) # stds
     # Labels
     ax.set_xlabel('Excess kurtosis')
     ax.set_ylabel('IPR')
     ax.legend()
-    fig.savefig(f'results/figures/ipr_kurtosis_{num_hiddens}/kurtosis_vs_ipr_{num_dimensions}.png', dpi=300, bbox_inches='tight')
-    ipdb.set_trace()
+    # fig.savefig(f'results/figures/ipr_kurtosis_{num_hiddens}/kurtosis_vs_ipr_{num_dimensions}.png', dpi=300, bbox_inches='tight')
+    fig.savefig(f'results/figures/ipr_kurtosis_{num_hiddens}/kurtosis_vs_ipr_{num_dimensions}.pdf', bbox_inches='tight')
+    # ipdb.set_trace()
     
     
     
