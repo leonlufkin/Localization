@@ -130,7 +130,7 @@ if __name__ == '__main__':
     weights_t, metrics = simulate_or_load(seed=0, dataset_cls=datasets.TDataset, df=3, 
                                           batch_size=50000,#1000, 
                                           xi=(1, 3,), num_dimensions=40, learning_rate=0.01, 
-                                          num_epochs=10000, evaluation_interval=100, 
+                                          num_epochs=10000, #evaluation_interval=100, 
                                           num_steps=10000, 
                                           init_scale=0.001,#1, 
                                           **config_)
