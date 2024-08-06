@@ -153,8 +153,8 @@ if __name__ == '__main__':
     ax2.set_title('l2(model - analytical)')
     fig.savefig(f'{dir}/ipr_mse.png')
     
-    # Plot timeshot after 25 steps
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+    # Plot timeshot after 40, 60, 100 steps
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
     # 40 steps
     ax1.plot(w_model[40], label='Empirical')
     ax1.plot(w_sim[40], label='Analytical')
@@ -167,7 +167,13 @@ if __name__ == '__main__':
     ax2.set_xlabel('Time')
     ax2.set_ylabel('Weight magnitude')
     ax2.set_title('Weights at t=60')
-    ax2.legend()
+    # 100 steps
+    ax3.plot(w_model[100], label='Empirical')
+    ax3.plot(w_sim[100], label='Analytical')
+    ax3.set_xlabel('Time')
+    ax3.set_ylabel('Weight magnitude')
+    ax3.set_title('Weights at t=100')
+    ax3.legend()
     fig.savefig(f'{dir}/timeshot.png')
     
     # Compare IPRs and difference across time
