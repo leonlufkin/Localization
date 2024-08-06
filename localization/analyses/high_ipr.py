@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # ))
     
     config.update(dict(
-        batch_size=1000,
+        batch_size=5000,
         num_epochs=50000,#100000,#
         evaluation_interval=500,
         learning_rate=1.,#5.,
