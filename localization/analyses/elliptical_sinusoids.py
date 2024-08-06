@@ -105,27 +105,6 @@ if __name__ == '__main__':
     n = data_config['num_dimensions']
     
     
-    # # Elliptical Extreme
-    # weights_weird, metrics = simulate_or_load(seed=42, dataset_cls=datasets.EllipticalDataset, inverse_cdf=lambda x: -0.5 * jnp.log(2/(x+1) - 1) + 2, batch_size=10000, **config)
-    
-    # fitparams, wfit, losses = fit_sinusoid(
-    #     weights_weird[-1,0],
-    #     init = (1., 0.005, 0.4, 0.04),
-    #     optimizer_fn = optax.sgd,
-    #     min_iterations = 1000,
-    # )
-    # print(losses[-1]) # 2.71e-06
-    # print(jnp.sqrt(losses[-1] * n) / jnp.sqrt(jnp.sum(weights_weird[-1,0] ** 2))) # 0.0414
-    
-    # fig, ax = plot_rf_evolution(weights_weird[:,[0],:], figsize=(4, 2), cmap='cb.solstice')
-    # ax.spines['top'].set_visible(False)
-    # ax.spines['right'].set_visible(False)
-    # ax.plot(wfit, c='r', linestyle='--')
-    # fig.savefig(f'results/figures/ellipticals/extreme.png', bbox_inches='tight', dpi=300)
-    # fig.savefig(f'results/figures/ellipticals/extreme.pdf', bbox_inches='tight')
-    # # ipdb.set_trace()
-    
-    
     # Student-t
     config_ = config.copy(); config_.pop('learning_rate'); config_.pop('num_steps'); config_.pop('num_epochs'); config_.pop('xi'); config_.pop('num_dimensions'); config_.pop('init_scale')
     weights_t, metrics = simulate_or_load(seed=0, dataset_cls=datasets.TDataset, df=3, 
@@ -154,23 +133,46 @@ if __name__ == '__main__':
     # ipdb.set_trace()
     
     
-    # # Elliptical Shell
-    # weights_shell, metrics = simulate_or_load(seed=0, dataset_cls=datasets.EllipticalDataset, inverse_cdf=lambda x: 1., batch_size=10000, **config)
-    # fig, ax = plot_rf_evolution(weights_shell[:,[0],:], figsize=(4, 2), cmap='cb.solstice')
+    # Elliptical Shell
+    weights_shell, metrics = simulate_or_load(seed=0, dataset_cls=datasets.EllipticalDataset, inverse_cdf=lambda x: 1., batch_size=10000, **config)
+    fig, ax = plot_rf_evolution(weights_shell[:,[0],:], figsize=(4, 2), cmap='cb.solstice')
     
-    # fitparams, wfit, losses = fit_sinusoid(
-    #     weights_shell[-1,0],
-    #     init = (1., 0.005, 0.25, -0.04),
-    #     optimizer_fn = optax.sgd,
-    #     min_iterations = 1000,
-    # )
-    # print(losses[-1]) # 2.43e-06
-    # print(jnp.sqrt(losses[-1] * n) / jnp.sqrt(jnp.sum(weights_shell[-1,0] ** 2))) # 0.0375
+    fitparams, wfit, losses = fit_sinusoid(
+        weights_shell[-1,0],
+        init = (1., 0.005, 0.25, -0.04),
+        optimizer_fn = optax.sgd,
+        min_iterations = 1000,
+    )
+    print(losses[-1]) # 2.43e-06
+    print(jnp.sqrt(losses[-1] * n) / jnp.sqrt(jnp.sum(weights_shell[-1,0] ** 2))) # 0.0375
     
-    # ax.spines['top'].set_visible(False)
-    # ax.spines['right'].set_visible(False)
-    # ax.plot(wfit, c='r', linestyle='--')
-    # fig.savefig('results/figures/ellipticals/shell.png', bbox_inches='tight', dpi=300)
-    # fig.savefig('results/figures/ellipticals/shell.pdf', bbox_inches='tight')
-    # # ipdb.set_trace()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.plot(wfit, c='r', linestyle='--')
+    fig.savefig('results/figures/ellipticals/shell.png', bbox_inches='tight', dpi=300)
+    fig.savefig('results/figures/ellipticals/shell.pdf', bbox_inches='tight')
+    # ipdb.set_trace()
+    
+    
+    # Elliptical Extreme
+    weights_weird, metrics = simulate_or_load(seed=42, dataset_cls=datasets.EllipticalDataset, inverse_cdf=lambda x: -0.5 * jnp.log(2/(x+1) - 1) + 2, batch_size=10000, **config)
+    
+    fitparams, wfit, losses = fit_sinusoid(
+        weights_weird[-1,0],
+        init = (1., 0.005, 0.4, 0.04),
+        optimizer_fn = optax.sgd,
+        min_iterations = 1000,
+    )
+    print(losses[-1]) # 2.71e-06
+    print(jnp.sqrt(losses[-1] * n) / jnp.sqrt(jnp.sum(weights_weird[-1,0] ** 2))) # 0.0414
+    
+    fig, ax = plot_rf_evolution(weights_weird[:,[0],:], figsize=(4, 2), cmap='cb.solstice')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.plot(wfit, c='r', linestyle='--')
+    fig.savefig(f'results/figures/ellipticals/extreme.png', bbox_inches='tight', dpi=300)
+    fig.savefig(f'results/figures/ellipticals/extreme.pdf', bbox_inches='tight')
+    # ipdb.set_trace()
+    
+    
     
