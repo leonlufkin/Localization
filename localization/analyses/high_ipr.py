@@ -31,16 +31,16 @@ if __name__ == '__main__':
     
     config.update(dict(
         batch_size=5000,
-        num_epochs=50000,#100000,#
-        evaluation_interval=500,
-        learning_rate=1.,#5.,
+        num_epochs=10000,#100000,#
+        evaluation_interval=100,
+        learning_rate=10.,#5.,
         num_hiddens=10,
     ))
     
-    # # sweep params
-    # # seed = tuple(np.arange(30)),
-    # # num_dimensions = (40, 100, 400,)
-    # # dataset_cls = (datasets.NonlinearGPDataset, datasets.NortaDataset,)
+    # sweep params
+    # seed = tuple(np.arange(30)),
+    # num_dimensions = (40, 100, 400,)
+    # dataset_cls = (datasets.NonlinearGPDataset, datasets.NortaDataset,)
     gains = jnp.logspace(-2, 2, 10)
     ks = jnp.array([4.1, 4.3, 4.5, 4.74, 5.0, 5.4, 6.1, 7.7, 10., 50.]) 
     ks = jnp.concatenate([ks, jnp.linspace(4, 10, 7)])

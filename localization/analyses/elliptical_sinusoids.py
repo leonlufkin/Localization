@@ -105,24 +105,24 @@ if __name__ == '__main__':
     n = data_config['num_dimensions']
     
     
-    # # Elliptical Extreme
-    # weights_weird, metrics = simulate_or_load(seed=42, dataset_cls=datasets.EllipticalDataset, inverse_cdf=lambda x: -0.5 * jnp.log(2/(x+1) - 1) + 2, batch_size=10000, **config)
+    # Elliptical Extreme
+    weights_weird, metrics = simulate_or_load(seed=42, dataset_cls=datasets.EllipticalDataset, inverse_cdf=lambda x: -0.5 * jnp.log(2/(x+1) - 1) + 2, batch_size=10000, **config)
     
-    # fitparams, wfit, losses = fit_sinusoid(
-    #     weights_weird[-1,0],
-    #     init = (1., 0.005, 0.4, 0.04),
-    #     optimizer_fn = optax.sgd,
-    #     min_iterations = 1000,
-    # )
-    # print(losses[-1]) # 2.71e-06
-    # print(jnp.sqrt(losses[-1] * n) / jnp.sqrt(jnp.sum(weights_weird[-1,0] ** 2)))
+    fitparams, wfit, losses = fit_sinusoid(
+        weights_weird[-1,0],
+        init = (1., 0.005, 0.4, 0.04),
+        optimizer_fn = optax.sgd,
+        min_iterations = 1000,
+    )
+    print(losses[-1]) # 2.71e-06
+    print(jnp.sqrt(losses[-1] * n) / jnp.sqrt(jnp.sum(weights_weird[-1,0] ** 2))) # 0.0414
     
-    # fig, ax = plot_rf_evolution(weights_weird[:,[0],:], figsize=(4, 2), cmap='cb.solstice')
-    # ax.spines['top'].set_visible(False)
-    # ax.spines['right'].set_visible(False)
-    # ax.plot(wfit, c='r', linestyle='--')
-    # fig.savefig(f'results/figures/ellipticals/extreme.png', bbox_inches='tight', dpi=300)
-    # # ipdb.set_trace()
+    fig, ax = plot_rf_evolution(weights_weird[:,[0],:], figsize=(4, 2), cmap='cb.solstice')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.plot(wfit, c='r', linestyle='--')
+    fig.savefig(f'results/figures/ellipticals/extreme.png', bbox_inches='tight', dpi=300)
+    # ipdb.set_trace()
     
     
     # Student-t
@@ -137,12 +137,12 @@ if __name__ == '__main__':
     
     fitparams, wfit, losses = fit_sinusoid(
         weights_t[-1,0],
-        init = (1., 0.05, 0., 0.),
+        init = (2., 0.015, 0.1, -0.03),
         optimizer_fn = optax.sgd,
         min_iterations = 1000,
     )
     print(losses[-1]) # 0.000289
-    print(jnp.sqrt(losses[-1] * n) / jnp.sqrt(jnp.sum(weights_t[-1,0] ** 2)))
+    print(jnp.sqrt(losses[-1] * n) / jnp.sqrt(jnp.sum(weights_t[-1,0] ** 2))) # 0.0977
     
     fig, ax = plot_rf_evolution(weights_t[:,[0],:], figsize=(4, 2), cmap='cb.solstice')
     ax.spines['top'].set_visible(False)
@@ -152,22 +152,22 @@ if __name__ == '__main__':
     # ipdb.set_trace()
     
     
-    # # Elliptical Shell
-    # weights_shell, metrics = simulate_or_load(seed=0, dataset_cls=datasets.EllipticalDataset, inverse_cdf=lambda x: 1., batch_size=10000, **config)
-    # fig, ax = plot_rf_evolution(weights_shell[:,[0],:], figsize=(4, 2), cmap='cb.solstice')
+    # Elliptical Shell
+    weights_shell, metrics = simulate_or_load(seed=0, dataset_cls=datasets.EllipticalDataset, inverse_cdf=lambda x: 1., batch_size=10000, **config)
+    fig, ax = plot_rf_evolution(weights_shell[:,[0],:], figsize=(4, 2), cmap='cb.solstice')
     
-    # fitparams, wfit, losses = fit_sinusoid(
-    #     weights_shell[-1,0],
-    #     init = (1., 0.005, 0.25, -0.04),
-    #     optimizer_fn = optax.sgd,
-    #     min_iterations = 1000,
-    # )
-    # print(losses[-1]) # 2.43e-06
-    # print(jnp.sqrt(losses[-1] * n) / jnp.sqrt(jnp.sum(weights_shell[-1,0] ** 2)))
+    fitparams, wfit, losses = fit_sinusoid(
+        weights_shell[-1,0],
+        init = (1., 0.005, 0.25, -0.04),
+        optimizer_fn = optax.sgd,
+        min_iterations = 1000,
+    )
+    print(losses[-1]) # 2.43e-06
+    print(jnp.sqrt(losses[-1] * n) / jnp.sqrt(jnp.sum(weights_shell[-1,0] ** 2))) # 0.0375
     
-    # ax.spines['top'].set_visible(False)
-    # ax.spines['right'].set_visible(False)
-    # ax.plot(wfit, c='r', linestyle='--')
-    # fig.savefig('results/figures/ellipticals/shell.png', bbox_inches='tight', dpi=300)
-    # # ipdb.set_trace()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.plot(wfit, c='r', linestyle='--')
+    fig.savefig('results/figures/ellipticals/shell.png', bbox_inches='tight', dpi=300)
+    # ipdb.set_trace()
     
