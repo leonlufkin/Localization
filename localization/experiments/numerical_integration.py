@@ -84,7 +84,7 @@ if __name__ == '__main__':
     
     # Config
     c = dict(
-        seed=2,#1,#0, # 0
+        seed=3,#1,#0, # 0
         num_dimensions=100, # 100
         num_hiddens=1,
         dim=1,
