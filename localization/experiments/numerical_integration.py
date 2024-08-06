@@ -96,7 +96,7 @@ if __name__ == '__main__':
         optimizer_fn=optax.sgd,
         learning_rate=0.01,
         batch_size=50000,#10000,
-        num_epochs=5000,
+        num_epochs=10000,#5000,
         dataset_cls=datasets.NonlinearGPDataset,
         xi=(0.3, 0.7), #(0.7, 0.3,),
         # num_steps=10000,
@@ -106,7 +106,7 @@ if __name__ == '__main__':
         init_fn=models.xavier_normal_init,
         loss_fn='mse',
         save_=True,
-        evaluation_interval=50,
+        evaluation_interval=100,#50,
     )
     w_model = simulate_or_load(**c)[0][:,0]
     mini_key = f'seed={c["seed"]}_L={c["num_dimensions"]}_g={c["gain"]}_is={c["init_scale"]}_lr={c["learning_rate"]}_b={c["batch_size"]}_xi={c["xi"][0]},{c["xi"][1]}_T={c["num_epochs"]}'
