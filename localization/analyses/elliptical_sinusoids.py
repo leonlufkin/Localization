@@ -127,7 +127,9 @@ if __name__ == '__main__':
     
     # Student-t
     config_ = config.copy(); config_.pop('learning_rate'); config_.pop('num_steps'); config_.pop('num_epochs'); config_.pop('xi'); config_.pop('num_dimensions'); config_.pop('init_scale')
-    weights_t, metrics = simulate_or_load(seed=0, dataset_cls=datasets.TDataset, df=3, batch_size=1000, xi=(1, 3,), num_dimensions=40, learning_rate=0.01, num_steps=10000, num_epochs=10000, init_scale=1, **config_)
+    weights_t, metrics = simulate_or_load(seed=0, dataset_cls=datasets.TDataset, df=3, 
+                                          batch_size=10000,#1000, 
+                                          xi=(1, 3,), num_dimensions=40, learning_rate=0.01, num_steps=10000, num_epochs=10000, init_scale=1, **config_)
     
     fitparams, wfit, losses = fit_sinusoid(
         weights_t[-1,0],
