@@ -10,6 +10,7 @@ localization/results/weights/
 *.npy
 *.mat
 
+localization/results/figures/
 **/.DS_Store
 
 

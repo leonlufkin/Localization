@@ -1,18 +1,13 @@
-# PDE SIMULATION
-# This script numerically integrates the approximate PDE governing our single-ReLU-neuron neural net's dynamics.
-# It lets us easily:
-#   1. manipulate starting weights,
-#   2. manipulate the covariance function,
-#   3. manipulate other aspects of the model (like number of units), and
-#   4. maniuplate some aspects of the data (like relative size of classes) 
-
 import numpy as np
 import jax
 import jax.numpy as jnp
+import optax
 import matplotlib.pyplot as plt
-from localization import datasets, models, samplers
-from localization.utils import plot_rf_evolution
-from functools import partial
+from localization import datasets
+from localization import models
+from localization import samplers
+from localization.experiments import simulate, simulate_or_load, make_key
+from localization.utils import plot_receptive_fields, plot_rf_evolution, build_gaussian_covariance, build_non_gaussian_covariance, entropy_sort, build_DRT
 from scipy.special import erf
 from scipy.signal import fftconvolve
 from tqdm import tqdm
@@ -36,8 +31,8 @@ def integrate(w_init, cov1, cov0, lr, num_epochs, cov1_weight=0.5, cov0_weight=0
   sw0_ = np.zeros((num_epochs, n))
   f_ = np.zeros((num_epochs, n))
   
-  # C = jnp.abs(jnp.tile(jnp.arange(n)[:, jnp.newaxis], (1, n)) - jnp.tile(jnp.arange(n), (n, 1)))
-  # C = jnp.minimum(C, n - C)
+#   C = jnp.abs(jnp.tile(jnp.arange(n)[:, jnp.newaxis], (1, n)) - jnp.tile(jnp.arange(n), (n, 1)))
+#   C = jnp.minimum(C, n - C)
   C = jnp.arange(n)
   C = jnp.minimum(C, n - C)
   sigma1 = cov1(C / n)
@@ -126,3 +121,32 @@ if __name__ == '__main__':
     fig.savefig(f'results/figures/pde_simulation/{cov.__name__}.png')
     fig2.savefig(f'results/figures/pde_simulation/{cov.__name__}_covariance.png')
     
+
+if __name__ == '__main__':
+    # define config
+    config = dict(
+        # data config
+        num_dimensions=40,
+        xi=tuple(jnp.arange(0.1, 3, 0.1).tolist()), #(0.1, 3, 10),
+        adjust=(-1, 1),
+        class_proportion=0.5,
+        # model config
+        model_cls=models.MLP,
+        activation='relu', use_bias=False, batch_size=1000, init_scale=0.01, learning_rate=0.1, evaluation_interval=10,#10,
+        # activation='sigmoid', use_bias=True, bias_value=-1, bias_trainable=False, batch_size=1000, init_scale=0.1, learning_rate=0.1, evaluation_interval=10,
+        num_hiddens=1,
+        sampler_cls=samplers.EpochSampler,
+        init_fn=models.xavier_normal_init,
+        optimizer_fn=optax.sgd,
+        num_epochs=1000,
+        # experiment config
+        seed=42,#0,
+        save_=True,
+    )
+
+    # simulate
+    weights_nlgp, metrics_nlgp = simulate(**config, gain=100, dataset_cls=datasets.NonlinearGPDataset)
+    print("Metrics")
+    print(metrics_nlgp)
+    fig, axs = plot_rf_evolution(weights_nlgp[:,:1], figsize=(8, 4))
+    fig.savefig(f'/Users/leonlufkin/Documents/GitHub/Localization/localization/results/figures/twolayer_rf.png')

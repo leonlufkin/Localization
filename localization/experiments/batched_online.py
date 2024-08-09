@@ -33,7 +33,8 @@ from localization.utils import make_key
 from localization.models.feedforward import StopGradient
 
 import ipdb
-from jax.config import config
+# from jax.config import config
+from jax import config
 config.update("jax_enable_x64", True)
 config.update("jax_debug_nans", True)
 

@@ -2,6 +2,7 @@ import os
 import datetime
 from pathlib import Path
 from submit import get_submitit_executor, submit_jobs, product_kwargs
+from tqdm import tqdm
 
 def get_timestamp():
   """
@@ -9,12 +10,6 @@ def get_timestamp():
   Format: YYYY-MM-DD_HH-MM-SS
   """
   return datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
-def tupify(d: dict):
-  """
-  Make all values in a dictionary 1-element tuples.
-  """
-  return { k: (v,) for k, v in d.items() }
 
 def get_executor(job_name, cluster="slurm", partition="cpu", timeout_min=60, mem_gb=10, parallelism=30, gpus_per_node=0):
   """
