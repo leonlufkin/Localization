@@ -7,7 +7,7 @@ from functools import partial
 
 # from nets.datasets.base import Dataset
 # export PYTHONPATH="${PYTHONPATH}:./"
-from localization.datasets.base import Dataset, ExemplarType
+from jaxnets.datasets.base import Dataset, ExemplarType
 import scipy.io
 import ipdb
 

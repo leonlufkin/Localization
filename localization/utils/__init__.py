@@ -1,5 +1,6 @@
 """`Sampler`s operating over `Dataset`s."""
-from localization.utils.admin import make_key, make_ica_key
+from jaxnets.utils import Ignore
+from localization.utils.admin import make_key, localization_make_key, make_ica_key
 # from localization.utils.launcher import get_timestamp, get_executor#, submit_jobs, product_kwargs
 from localization.utils.sweeper import tupify, sweep_func
 from localization.utils.measurement import ipr, entropy, position_mean_var, entropy_sort, mean_sort, var_sort
@@ -8,7 +9,8 @@ from localization.utils.submit import submit_jobs, product_kwargs
 from localization.utils.visualization import plot_receptive_fields, plot_rf_evolution
 
 __all__ = (
-  "make_key", "make_ica_key",
+  "Ignore",
+  "make_key", "localization_make_key", "make_ica_key",
   # "get_timestamp", "tupify", "get_executor",# "submit_jobs, product_kwargs",
   "tupify", "sweep_func",
   "ipr", "entropy", "position_mean_var", "entropy_sort", "mean_sort", "var_sort",

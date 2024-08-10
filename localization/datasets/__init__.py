@@ -1,5 +1,5 @@
 
-from localization.datasets.base import Dataset
+from jaxnets.datasets.base import Dataset
 from localization.datasets.ising import IsingDataset
 from localization.datasets.nonlinear_gp import NonlinearGPDataset
 from localization.datasets.nlgp_gaussian_clone import NLGPGaussianCloneDataset

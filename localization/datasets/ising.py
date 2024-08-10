@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from localization.datasets.base import Dataset, ExemplarType
+from jaxnets.datasets.base import Dataset, ExemplarType
 from jax.scipy.special import erf as gain_function
 
 def E(

@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from localization.datasets.base import Dataset, ExemplarType
+from jaxnets.datasets.base import Dataset, ExemplarType
 from localization.datasets.qdfs import NormalQDF, UniformQDF, BernoulliQDF, LaplaceQDF, AlgQDF
 from localization.utils import build_DRT, build_gaussian_covariance, iterate_kron
 

@@ -6,53 +6,14 @@ import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 
+from jaxnets.models import trunc_normal_init, lecun_normal_init, xavier_normal_init
+
 import equinox as eqx
 import equinox.nn as enn
 
 from jax import Array
 from collections.abc import Callable
 import ipdb
-
-def trunc_normal_init(
-  weight: Array, key: Array, stddev: float | None = None
-) -> Array:
-  """Truncated normal distribution initialization."""
-  _, in_ = weight.shape
-  stddev = stddev or sqrt(1.0 / max(1.0, in_))
-  return stddev * jax.random.truncated_normal(
-    key=key,
-    shape=weight.shape,
-    lower=-2,
-    upper=2,
-  )
-
-
-# Adapted from https://github.com/deepmind/dm-haiku/blob/main/haiku/_src/initializers.py.
-def lecun_normal_init(
-  weight: Array,
-  key: Array,
-  scale: float = 1.0,
-) -> Array:
-  """LeCun (variance-scaling) normal distribution initialization."""
-  _, in_ = weight.shape
-  scale /= max(1.0, in_)
-
-  stddev = np.sqrt(scale)
-  # Adjust stddev for truncation.
-  # Constant from scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
-  distribution_stddev = jnp.asarray(0.87962566103423978, dtype=float)
-  stddev = stddev / distribution_stddev
-
-  return trunc_normal_init(weight, key, stddev=stddev)
-
-def xavier_normal_init(
-  weight: Array,
-  key: Array,
-  scale: float = 1.0,
-):
-  xavier = jax.nn.initializers.glorot_normal()
-  stddev = np.sqrt(scale)
-  return stddev * xavier(key, weight.shape)
 
 def torch_init(
   weight: Array,

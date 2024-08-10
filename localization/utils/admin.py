@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from collections.abc import Generator
 
 from localization import datasets
-
+from jaxnets.utils import make_key as jaxnets_make_key
 
 def interval_to_str(interval):
   if isinstance(interval, tuple):
@@ -41,7 +41,13 @@ def xi_to_str(xi):
       xi_str = '_xi=' + ','.join([ f"{xi_:05.2f}" for xi_ in xi ])
   return xi_str 
   
-def make_key(dataset_cls, adjust, xi, class_proportion, batch_size, num_epochs, learning_rate, model_cls, use_bias, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, loss_fn: str | Callable = 'mse', bias_value=None, gain=None, marginal_qdf=None, dim=1, df=None, seed=None, base_dataset=None, marginal_adjust=None, supervise=True, beta=None, rho=None, **extra_kwargs):
+def make_key(**config):
+  return jaxnets_make_key(
+    remove_keys=['wandb_', 'save_weights', 'save_model', 'task', 'config_modifier'],
+    config=config
+  )
+  
+def localization_make_key(dataset_cls, adjust, xi, class_proportion, batch_size, num_epochs, learning_rate, model_cls, use_bias, num_dimensions, num_hiddens, activation, init_scale, init_fn: Callable, loss_fn: str | Callable = 'mse', bias_value=None, gain=None, marginal_qdf=None, dim=1, df=None, seed=None, base_dataset=None, marginal_adjust=None, supervise=True, beta=None, rho=None, **extra_kwargs):
   dataset_name = dataset_cls.__name__
   model_name = model_cls.__name__
   base_dataset_name = base_dataset.__name__ if base_dataset is not None else None
@@ -65,7 +71,7 @@ def make_key(dataset_cls, adjust, xi, class_proportion, batch_size, num_epochs, 
     f'_init_scale={init_scale:.3f}_{init_fn.__name__ if isinstance(init_fn, Callable) else init_fn}'\
     f'{f"_seed={seed:d}" if seed is not None else ""}' + ('_autoencode' if not supervise else '')\
     + (f'_beta={beta:.3f}' if (beta is not None) and (beta != 0.) else '') + (f'_rho={rho:.3f}' if (rho is not None) and ((beta is not None) and (beta != 0.)) else '')
-    
+        
 def make_ica_key(num_dimensions, dataset_cls, xi, **extra_kwargs):
   dataset_name = dataset_cls.__name__
   if dataset_cls == datasets.NonlinearGPDataset:

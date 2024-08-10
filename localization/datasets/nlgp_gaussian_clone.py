@@ -7,7 +7,7 @@ from functools import partial
 
 # from nets.datasets.base import Dataset
 # export PYTHONPATH="${PYTHONPATH}:./"
-from localization.datasets.base import Dataset, ExemplarType
+from jaxnets.datasets.base import Dataset, ExemplarType
 from localization.utils import build_DRT, build_non_gaussian_covariance, iterate_kron
 # from nets.datasets.base import DatasetSplit
 # from nets.datasets.base import ExemplarType

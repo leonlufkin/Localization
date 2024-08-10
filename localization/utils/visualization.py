@@ -10,7 +10,7 @@ import ipdb
 #########################
 # VISUALIZATION FUNCTIONS
 
-def plot_receptive_fields(weights: list, num_cols=None, evaluation_interval=500, figsize=(10, 5), reordering_fn=None, **reordering_kwargs):
+def plot_receptive_fields(weights: list, num_cols=None, evaluation_interval=500, figsize=(10, 5), reordering_fn=None, fig=None, axs=None, **reordering_kwargs):
     num_cols = num_cols or len(weights)
     num_rows = int(np.ceil(len(weights) / num_cols))
     
@@ -18,7 +18,8 @@ def plot_receptive_fields(weights: list, num_cols=None, evaluation_interval=500,
     reordering = reordering_fn(weights=weights, **reordering_kwargs) if reordering_fn is not None else np.arange(weights.shape[1])
     
     # plot each set of weights
-    fig, axs = plt.subplots(num_rows, num_cols, figsize=figsize)
+    if fig is None and axs is None:
+        fig, axs = plt.subplots(num_rows, num_cols, figsize=figsize)
     axs_ = axs.flatten() if isinstance(axs, np.ndarray) else np.array([axs])
     min_, max_ = np.min([np.min(weight_) for weight_ in weights]), np.max([np.max(weight_) for weight_ in weights])
     for i, (weight, ax) in enumerate(zip(weights, axs_)):
@@ -37,11 +38,12 @@ def plot_receptive_fields(weights: list, num_cols=None, evaluation_interval=500,
     
     return fig, axs
 
-def plot_rf_evolution(weights, num_rows=1, num_cols=1, figsize=(15, 5), cmap='gray'):
+def plot_rf_evolution(weights, num_rows=1, num_cols=1, figsize=(15, 5), cmap='gray', fig=None, axs=None):
     if weights.ndim == 2: # means we're just looking at a single neuron
         weights = weights[:,np.newaxis]
     # num_rows * num_cols is the number of receptive fields to plot
-    fig, axs = plt.subplots(num_rows, num_cols, figsize=figsize, sharex=True, sharey=True)
+    if fig is None and axs is None:
+        fig, axs = plt.subplots(num_rows, num_cols, figsize=figsize, sharex=True, sharey=True)
     cmap_ = plt.get_cmap(cmap)
     color = cmap_(np.linspace(0.2, 0.8, weights.shape[0]))
     for i, ax in enumerate(axs.flatten() if isinstance(axs, np.ndarray) else [axs]):
