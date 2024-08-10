@@ -43,7 +43,7 @@ if __name__ == '__main__':
     evaluation_interval=100,
   )
   
-  for gain in np.logspace(-1, 1, 10):
+  for gain in np.logspace(-0.5, 0.25, 10):
     config['gain'] = gain
     metrics, weights, model = simulate_or_load(**config)
       
